@@ -8,7 +8,7 @@
 #include "l3g4200d.h"
 
 #define GYRO_ADDRESS 0b1101000
-
+//https://github.com/jmondi/EHF_FreeRTOS/tree/master/Libraries/ML_Lib/src
 char read_register(I2C_TypeDef* I2Cx, char reg);
 
 void init_gyro(I2C_TypeDef* I2Cx){
