@@ -9,7 +9,6 @@ GPIO_InitTypeDef GPIO_InitStructure;
 void Delay(__IO uint32_t nCount);
 
 int main(void) {
-	SystemInit();
 	init_I2C1(); // initialize I2C peripheral
 	init_gyro(I2C1);
 	int16_t gyro[3] = { 0 };
