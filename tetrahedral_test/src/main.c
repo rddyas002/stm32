@@ -2,13 +2,13 @@
 #include "stm32f4_discovery.h"
 #include "i2c.h"
 #include "l3g4200d.h"
+#include "usart.h"
 #include <math.h>
-
-GPIO_InitTypeDef GPIO_InitStructure;
 
 void Delay(__IO uint32_t nCount);
 
 void init_gpio(void){
+	GPIO_InitTypeDef GPIO_InitStructure;
 	/* GPIOD Periph clock enable */
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
 
@@ -22,11 +22,13 @@ void init_gpio(void){
 }
 
 int main(void) {
+	// enable FPU full access
 	SCB->CPACR |= ((3UL << 10*2)|(3UL << 11*2)); /* set CP10 and CP11 Full Access */
 
 	init_I2C1(); // initialize I2C peripheral
 	init_gyro(I2C1);
 	init_gpio();
+	init_USART1(115200);
 
 	int16_t gyro[3] = { 0 };
 	float gyro_f[3] = { 0 };
@@ -39,40 +41,3 @@ int main(void) {
 		Delay(0x3FFFFF);
 	}
 }
-
-void GPIO_test(void) {
-
-
-	while (1) {
-		/* PD12 to be toggled */
-		GPIO_SetBits(GPIOD, GPIO_Pin_12);
-
-		/* Insert delay */
-		Delay(0x3FFFFF);
-
-		/* PD13 to be toggled */
-		GPIO_SetBits(GPIOD, GPIO_Pin_13);
-
-		/* Insert delay */
-		Delay(0x3FFFFF);
-
-		/* PD14 to be toggled */
-		GPIO_SetBits(GPIOD, GPIO_Pin_14);
-
-		/* Insert delay */
-		Delay(0x3FFFFF);
-
-		/* PD15 to be toggled */
-		GPIO_SetBits(GPIOD, GPIO_Pin_15);
-
-		/* Insert delay */
-		Delay(0x7FFFFF);
-
-		GPIO_ResetBits(GPIOD,
-		GPIO_Pin_12 | GPIO_Pin_13 | GPIO_Pin_14 | GPIO_Pin_15);
-
-		/* Insert delay */
-		Delay(0xFFFFFF);
-	}
-}
-
