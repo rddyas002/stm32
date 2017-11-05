@@ -13,6 +13,7 @@
 #include <stm32f4xx_usart.h>
 
 void init_USART1(uint32_t baudrate);
+void init_USART2(uint32_t baudrate);
 void USART_puts(USART_TypeDef* USARTx, volatile char *s);
 
 #endif /* USART_H_ */
