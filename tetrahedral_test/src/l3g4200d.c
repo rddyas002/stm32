@@ -53,7 +53,6 @@ void read_gyro(I2C_TypeDef* I2Cx, int16_t gyro[3]){
 		Delay(100000);
 	}
 
-	int16_t gyro_int[3] = {0};
 	gyro[0] = (int16_t)(((uint16_t)rx_data[1] << 8) | (uint16_t)rx_data[0]);
 	gyro[1] = (int16_t)(((uint16_t)rx_data[3] << 8) | (uint16_t)rx_data[2]);
 	gyro[2] = (int16_t)(((uint16_t)rx_data[5] << 8) | (uint16_t)rx_data[4]);

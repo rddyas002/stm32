@@ -30,8 +30,8 @@ int main(void) {
 	init_USART2(115200);
 
 	int16_t gyro[3] = { 0 };
-	float gyro_f[3] = { 0 };
 	while (1) {
+		float gyro_f[3] = { 0 };
 		read_gyro(I2C1, gyro);
 		gyro_f[0] = gyro[0] * 70E-3f;
 		gyro_f[1] = gyro[1] * 70E-3f;

@@ -108,7 +108,7 @@ void USART1_IRQHandler(void){
 			t = USART1->DR;
 		}
 */
-		static uint8_t cnt = 0; 	// this counter is used to determine the string length
+		//static uint8_t cnt = 0; 	// this counter is used to determine the string length
 		char t = USART1->DR; 		// the character from the USART1 data register is saved in t
 		while( !(USART1->SR & 0x00000040) );
 		USART_SendData(USART1, t);
@@ -140,7 +140,7 @@ void USART2_IRQHandler(void){
 			t = USART1->DR;
 		}
 */
-		static uint8_t cnt = 0; 	// this counter is used to determine the string length
+		//static uint8_t cnt = 0; 	// this counter is used to determine the string length
 		char t = USART2->DR; 		// the character from the USART2 data register is saved in t
 		while( !(USART2->SR & 0x00000040) );
 		USART_SendData(USART2, t);
