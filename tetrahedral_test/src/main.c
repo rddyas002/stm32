@@ -1,4 +1,3 @@
-/* Includes ------------------------------------------------------------------*/
 #include "stm32f4_discovery.h"
 #include "i2c.h"
 #include "l3g4200d.h"
@@ -28,12 +27,11 @@ int main(void) {
 	init_I2C1(); // initialize I2C peripheral
 	init_gyro(I2C1);
 	init_gpio();
-	init_USART1(115200);
+	init_USART2(115200);
 
 	int16_t gyro[3] = { 0 };
 	float gyro_f[3] = { 0 };
 	while (1) {
-		GPIO_ToggleBits(GPIOD, GPIO_Pin_12);
 		read_gyro(I2C1, gyro);
 		gyro_f[0] = gyro[0] * 70E-3f;
 		gyro_f[1] = gyro[1] * 70E-3f;
