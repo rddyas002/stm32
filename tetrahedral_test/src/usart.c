@@ -108,24 +108,21 @@ void USART1_IRQHandler(void){
 			t = USART1->DR;
 		}
 */
-		//static uint8_t cnt = 0; 	// this counter is used to determine the string length
+		static uint8_t cnt = 0; 	// this counter is used to determine the string length
 		char t = USART1->DR; 		// the character from the USART1 data register is saved in t
-		while( !(USART1->SR & 0x00000040) );
-		USART_SendData(USART1, t);
-		GPIO_ToggleBits(GPIOD, GPIO_Pin_12);
+		//while( !(USART1->SR & 0x00000040) );
+		//USART_SendData(USART1, t);
+		//GPIO_ToggleBits(GPIOD, GPIO_Pin_12);
 
-		/* check if the received character is not the LF character (used to determine end of string)
-		 * or the if the maximum string length has been been reached
-
-		if( (t != '\n') && (cnt < MAX_STRLEN) ){
+		if( (t != '\0') && (cnt < MAX_STRLEN) ){
 			received_string[cnt] = t;
 			cnt++;
 		}
 		else{ // otherwise reset the character counter and print the received string
-			cnt = 0;
+			received_string[cnt] = '\0';
 			USART_puts(USART1, received_string);
+			cnt = 0;
 		}
-		*/
 	}
 }
 
@@ -141,10 +138,9 @@ void USART2_IRQHandler(void){
 		}
 */
 		//static uint8_t cnt = 0; 	// this counter is used to determine the string length
-		char t = USART2->DR; 		// the character from the USART2 data register is saved in t
-		while( !(USART2->SR & 0x00000040) );
-		USART_SendData(USART2, t);
-		GPIO_ToggleBits(GPIOD, GPIO_Pin_12);
+//		char t = USART2->DR; 		// the character from the USART2 data register is saved in t
+	//	while( !(USART2->SR & 0x00000040) );
+//		USART_SendData(USART2, t);
 
 		/* check if the received character is not the LF character (used to determine end of string)
 		 * or the if the maximum string length has been been reached
@@ -158,5 +154,22 @@ void USART2_IRQHandler(void){
 			USART_puts(USART1, received_string);
 		}
 		*/
+
+		static uint8_t cnt = 0; 	// this counter is used to determine the string length
+		char t = USART2->DR; 		// the character from the USART1 data register is saved in t
+		//while( !(USART1->SR & 0x00000040) );
+		//USART_SendData(USART1, t);
+		//GPIO_ToggleBits(GPIOD, GPIO_Pin_12);
+
+		if( (t != '\0') && (cnt < MAX_STRLEN) ){
+			received_string[cnt] = t;
+			cnt++;
+		}
+		else{ // otherwise reset the character counter and print the received string
+			received_string[cnt] = '\0';
+			USART_puts(USART2, received_string);
+			GPIO_ToggleBits(GPIOD, GPIO_Pin_12);
+			cnt = 0;
+		}
 	}
 }

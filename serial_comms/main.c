@@ -1,5 +1,17 @@
-#include <windows.h>
 #include <stdio.h>
+#include <stdlib.h>
+#define _POSIX_THREAD_SAFE_FUNCTIONS
+#include <time.h>
+#include <signal.h>
+#include <string.h>
+#include <stdbool.h>
+#include <unistd.h>
+#include <windows.h>
+
+static volatile int keepRunning = 1;
+void intHandler(int dummy) {
+    keepRunning = 0;
+}
 
 int openSerialComms(HANDLE hSerial){
 	DCB dcbSerialParams = {0};
@@ -52,24 +64,28 @@ int closeSerialComms(HANDLE hSerial){
 int sendSerialComms(HANDLE hSerial, char * data, char length){
 	// Send specified text (remaining command line arguments)
 	DWORD bytes_written;
-	fprintf(stderr, "Sending bytes...");
 	if(!WriteFile(hSerial, data, length, &bytes_written, NULL)){
 		fprintf(stderr, "Error\n");
 		CloseHandle(hSerial);
 		return 1;
 	}
-	fprintf(stderr, "%lu bytes written\n", bytes_written);
 	return 0;
 }
 
+DWORD readSerialComms(HANDLE hSerial, char * data){
+	DWORD bytes_read;
+	if(!ReadFile(hSerial, data, 11, &bytes_read, NULL)){
+		fprintf(stderr, "Error\n");
+		CloseHandle(hSerial);
+		return 1;
+	}
+	return bytes_read;
+}
+
 int main(int argc, char *argv[]){
-	// Define the five bytes to send ("hello")
-	char bytes_to_send[5];
-	bytes_to_send[0] = 104;
-	bytes_to_send[1] = 101;
-	bytes_to_send[2] = 108;
-	bytes_to_send[3] = 108;
-	bytes_to_send[4] = 111;
+	signal(SIGINT, intHandler);
+
+	char bytes_to_send[11] = {'0','1','2','3','4','5','6','7','8','9','\0'};
 
 	// Declare variables and structures
 	HANDLE hSerial;
@@ -91,9 +107,23 @@ int main(int argc, char *argv[]){
 	}
 	else fprintf(stderr, "OK\n");
 
-
 	openSerialComms(hSerial);
-	sendSerialComms(hSerial, &bytes_to_send[0], 5);
+
+	struct timespec transmit_time;
+	struct timespec receive_time;
+	char received_bytes[64];
+	while(keepRunning){
+		// send 16 bytes
+		clock_gettime(CLOCK_MONOTONIC, &transmit_time);
+		sendSerialComms(hSerial, &bytes_to_send[0], 11);
+		// wait for data return
+		DWORD len = readSerialComms(hSerial, &received_bytes[0]);
+		clock_gettime(CLOCK_MONOTONIC, &receive_time);
+		double delta_t = (receive_time.tv_sec - transmit_time.tv_sec) + (double)(receive_time.tv_nsec - transmit_time.tv_nsec)/1e9;
+		printf("dt: %6.0fms\n", delta_t*1e3);
+		sleep(1);
+	}
+
 	closeSerialComms(hSerial);
 
 	// exit normally

@@ -10,12 +10,6 @@ void init_I2C1(void){
 	// enable clock for SCL and SDA pins
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB, ENABLE);
 
-	/* setup SCL and SDA pins
-	 * You can connect I2C1 to two different
-	 * pairs of pins:
-	 * 1. SCL on PB6 and SDA on PB7
-	 * 2. SCL on PB8 and SDA on PB9
-	 */
 	GPIO_InitStruct.GPIO_Pin = GPIO_Pin_6 | GPIO_Pin_7; // we are going to use PB6 and PB7
 	GPIO_InitStruct.GPIO_Mode = GPIO_Mode_AF;			// set pins to alternate function
 	GPIO_InitStruct.GPIO_Speed = GPIO_Speed_50MHz;		// set GPIO speed
@@ -115,6 +109,18 @@ uint8_t I2C_read_nack(I2C_TypeDef* I2Cx){
 	// read data from I2C data register and return data byte
 	uint8_t data = I2C_ReceiveData(I2Cx);
 	return data;
+}
+
+char read_register(I2C_TypeDef* I2Cx, char address, char reg){
+	char tmp;
+	I2C_start(I2Cx, address << 1, I2C_Direction_Transmitter); 	// start a transmission in Master transmitter mode
+	I2C_write(I2Cx, reg);
+	I2C_stop(I2Cx);
+
+	I2C_start(I2Cx, address << 1, I2C_Direction_Receiver); 	// start a transmission in Master receiver mode
+	tmp = I2C_read_nack(I2Cx);
+	I2C_stop(I2Cx);
+	return tmp;
 }
 
 /* This funtion issues a stop condition and therefore
