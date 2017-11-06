@@ -33,24 +33,12 @@ void init_gyro(I2C_TypeDef* I2Cx){
 void read_gyro(I2C_TypeDef* I2Cx, int16_t gyro[3]){
 	int i;
 	char rx_data[6] = {0};
-/*
-	// read data
-	I2C_start(I2Cx, GYRO_ADDRESS << 1, I2C_Direction_Transmitter); 	// start a transmission in Master transmitter mode
-	I2C_write(I2Cx, 0x28);
-	I2C_start(I2Cx, GYRO_ADDRESS << 1, I2C_Direction_Receiver); 	// start a transmission in Master receiver mode
-	for (i = 0; i < 5; i++){
-		Delay(100000);
-		rx_data[i] = I2C_read_ack(I2Cx);
-	}
-	Delay(100000);
-	rx_data[5] = I2C_read_nack(I2Cx);
-	I2C_stop(I2Cx);
-	*/
 
 	for (i = 0; i < 6; i++){
 		rx_data[i] = read_register(I2C1, GYRO_ADDRESS, 0x28 + i);
 		Delay(100000);
 	}
+
 
 	gyro[0] = (int16_t)(((uint16_t)rx_data[1] << 8) | (uint16_t)rx_data[0]);
 	gyro[1] = (int16_t)(((uint16_t)rx_data[3] << 8) | (uint16_t)rx_data[2]);

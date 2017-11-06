@@ -2,19 +2,20 @@
 
 void HMC5883L_WriteByte(I2C_TypeDef* I2Cx, u8 slaveAddr, uint8_t address, uint8_t data);
 uint8_t HMC5883L_ReadByte(I2C_TypeDef* I2Cx, u8 slaveAddr, uint8_t address);
+void HMC5883L_ReadBytes(I2C_TypeDef* I2Cx, u8 slaveAddr, uint8_t startAddress, uint8_t * data, uint8_t bytes);
 
 void init_mag(I2C_TypeDef* I2Cx) {
 	// write CONFIG_A register
 	uint8_t tmp = 0b00011100;
-	HMC5883L_WriteByte(I2C1, HMC5883L_DEFAULT_ADDRESS, tmp, HMC5883L_RA_CONFIG_A);
+	HMC5883L_WriteByte(I2Cx, HMC5883L_DEFAULT_ADDRESS, HMC5883L_RA_CONFIG_A, tmp);
 
 	// write CONFIG_B register
 	tmp = 0b00100000;
-	HMC5883L_WriteByte(I2Cx, HMC5883L_DEFAULT_ADDRESS, tmp, HMC5883L_RA_CONFIG_B);
+	HMC5883L_WriteByte(I2Cx, HMC5883L_DEFAULT_ADDRESS, HMC5883L_RA_CONFIG_B, tmp);
 
 	// write MODE register
 	tmp = 0b0;
-	HMC5883L_WriteByte(I2Cx, HMC5883L_DEFAULT_ADDRESS, tmp, HMC5883L_RA_MODE);
+	HMC5883L_WriteByte(I2Cx, HMC5883L_DEFAULT_ADDRESS, HMC5883L_RA_MODE, tmp);
 }
 
 void HMC5883L_WriteByte(I2C_TypeDef* I2Cx, u8 slaveAddr, uint8_t address, uint8_t data) {
@@ -105,16 +106,12 @@ uint8_t HMC5883L_ReadByte(I2C_TypeDef* I2Cx, u8 slaveAddr, uint8_t address) {
 }
 
 void read_mag(I2C_TypeDef* I2Cx, int16_t B[3]) {
-	// Read x
-	B[0] = HMC5883L_ReadByte(I2C1, HMC5883L_DEFAULT_ADDRESS, 0x03) << 8;
-	B[0] |= HMC5883L_ReadByte(I2C1, HMC5883L_DEFAULT_ADDRESS, 0x04);
-
-	// Read y
-	B[1] = HMC5883L_ReadByte(I2C1, HMC5883L_DEFAULT_ADDRESS, 0x07) << 8;
-	B[1] |= HMC5883L_ReadByte(I2C1, HMC5883L_DEFAULT_ADDRESS, 0x08);
-
-	// Read z
-	B[2] = HMC5883L_ReadByte(I2C1, HMC5883L_DEFAULT_ADDRESS, 0x05) << 8;
-	B[2] |= HMC5883L_ReadByte(I2C1, HMC5883L_DEFAULT_ADDRESS, 0x06);
-
+	uint8_t data[6] = {0};
+	I2C_ReadBytes(I2C1, HMC5883L_DEFAULT_ADDRESS, 0x03, &data[0], 6);
+	B[0] = data[1];
+	B[0] |= data[0] << 8;
+	B[1] = data[5];
+	B[1] |= data[4] << 8;
+	B[2] = data[3];
+	B[2] |= data[2] << 8;
 }

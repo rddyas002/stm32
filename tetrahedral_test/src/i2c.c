@@ -123,6 +123,50 @@ char read_register(I2C_TypeDef* I2Cx, char address, char reg){
 	return tmp;
 }
 
+void I2C_ReadBytes(I2C_TypeDef* I2Cx, u8 slaveAddr, uint8_t startAddress, uint8_t * data, uint8_t bytes) {
+	// Wait while I2C busy
+	while (I2C_GetFlagStatus(I2Cx, I2C_FLAG_BUSY));
+
+	// Send start
+	I2C_GenerateSTART(I2Cx, ENABLE);
+	while (!I2C_CheckEvent(I2Cx, I2C_EVENT_MASTER_MODE_SELECT))	;
+
+	// Send HMC5883L address for write
+	I2C_Send7bitAddress(I2Cx, slaveAddr, I2C_Direction_Transmitter);
+	while (!I2C_CheckEvent(I2Cx, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED));
+
+	// Send register address
+	I2C_SendData(I2Cx, startAddress);
+	while (!I2C_CheckEvent(I2Cx, I2C_EVENT_MASTER_BYTE_TRANSMITTED));
+
+	// Repeated start
+	I2C_GenerateSTART(I2Cx, ENABLE);
+	while (!I2C_CheckEvent(I2Cx, I2C_EVENT_MASTER_MODE_SELECT))	;
+
+	// Send HMC5883L address for read
+	I2C_Send7bitAddress(I2Cx, slaveAddr, I2C_Direction_Receiver);
+	while (!I2C_CheckEvent(I2Cx, I2C_EVENT_MASTER_RECEIVER_MODE_SELECTED));
+
+	I2C_AcknowledgeConfig(I2Cx, ENABLE);
+
+	int i;
+	for (i = 0; i < bytes - 1; i++){
+		// wait for byte to be received
+		while (!I2C_CheckEvent(I2Cx, I2C_EVENT_MASTER_BYTE_RECEIVED));
+		*data++ = I2C_ReceiveData(I2Cx);
+	}
+	// last byte
+	I2C_AcknowledgeConfig(I2Cx, DISABLE);
+	while (!I2C_CheckEvent(I2Cx, I2C_EVENT_MASTER_BYTE_RECEIVED));
+	*data = I2C_ReceiveData(I2Cx);
+
+	// Generate stop
+	I2C_GenerateSTOP(I2Cx, ENABLE);
+
+	// Enable ACK
+	I2C_AcknowledgeConfig(I2Cx, ENABLE);
+}
+
 /* This funtion issues a stop condition and therefore
  * releases the bus
  */
