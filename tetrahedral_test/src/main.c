@@ -6,6 +6,7 @@
 #include "i2c.h"
 #include "l3g4200d.h"
 #include "adxl345.h"
+#include "hmc5883l.h"
 #include "usart.h"
 #include "gpio.h"
 #include "CciProtocol.h"
@@ -22,6 +23,7 @@ int main(void) {
 	init_I2C1(); // initialize I2C peripheral
 	init_gyro(I2C1);
 	init_accel(I2C1);
+	init_mag(I2C1);
 	init_gpio();
 	init_USART2(115200);
 	init_cci(129);
