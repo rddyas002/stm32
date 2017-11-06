@@ -1,8 +1,14 @@
+#include <string.h>
+#include <stdlib.h>
 
 #include "usart.h"
+#include "CciProtocol.h"
 
-#define MAX_STRLEN 12							 // this is the maximum string length of our string in characters
+#define MAX_STRLEN 12
+#define MAX_CCI_LEN 16
 volatile char received_string[MAX_STRLEN+1]; 	 // this will hold the recieved string
+volatile char cci_rx[MAX_CCI_LEN]; 	 // this will hold the recieved string
+CCI_MessageFull * cciRxMsg;
 
 void init_USART1(uint32_t baudrate){
 	GPIO_InitTypeDef GPIO_InitStruct; 		// this is for the GPIO pins used as TX and RX
@@ -86,6 +92,8 @@ void init_USART2(uint32_t baudrate){
 
 	// finally this enables the complete USART2 peripheral
 	USART_Cmd(USART2, ENABLE);
+
+	cciRxMsg = (CCI_MessageFull * ) malloc(sizeof(CCI_MessageFull));
 }
 
 void USART_puts(USART_TypeDef* USARTx, volatile char *s){
@@ -123,7 +131,7 @@ void USART1_IRQHandler(void){
 		//USART_SendData(USART1, t);
 		//GPIO_ToggleBits(GPIOD, GPIO_Pin_12);
 
-		if( (t != '\0') && (cnt < MAX_STRLEN) ){
+		if(cnt < MAX_CCI_LEN){
 			received_string[cnt] = t;
 			cnt++;
 		}
@@ -136,48 +144,20 @@ void USART1_IRQHandler(void){
 }
 
 void USART2_IRQHandler(void){
-
 	// check if the USART2 receive interrupt flag was set
 	if( USART_GetITStatus(USART2, USART_IT_RXNE) ){
-/*
-		char t;
-		// clear received buffer
-		while(USART_GetStatus(USART_FLAG_RXNE)){
-			t = USART1->DR;
-		}
-*/
-		//static uint8_t cnt = 0; 	// this counter is used to determine the string length
-//		char t = USART2->DR; 		// the character from the USART2 data register is saved in t
-	//	while( !(USART2->SR & 0x00000040) );
-//		USART_SendData(USART2, t);
+		static uint8_t cnt = 0;
+		char t = USART2->DR;
 
-		/* check if the received character is not the LF character (used to determine end of string)
-		 * or the if the maximum string length has been been reached
-
-		if( (t != '\n') && (cnt < MAX_STRLEN) ){
-			received_string[cnt] = t;
+		if(cnt < MAX_CCI_LEN){
+			cci_rx[cnt] = t;
 			cnt++;
 		}
 		else{ // otherwise reset the character counter and print the received string
-			cnt = 0;
-			USART_puts(USART1, received_string);
-		}
-		*/
-
-		static uint8_t cnt = 0; 	// this counter is used to determine the string length
-		char t = USART2->DR; 		// the character from the USART1 data register is saved in t
-		//while( !(USART1->SR & 0x00000040) );
-		//USART_SendData(USART1, t);
-		//GPIO_ToggleBits(GPIOD, GPIO_Pin_12);
-
-		if( (t != '\0') && (cnt < MAX_STRLEN) ){
-			received_string[cnt] = t;
-			cnt++;
-		}
-		else{ // otherwise reset the character counter and print the received string
-			received_string[cnt] = '\0';
-			USART_puts(USART2, received_string);
-			GPIO_ToggleBits(GPIOD, GPIO_Pin_12);
+			cci_rx[cnt] = t;
+			decodeCciHeader(&cci_rx[0], cciRxMsg);
+			//USART_puts(USART2, received_string);
+			//GPIO_ToggleBits(GPIOD, GPIO_Pin_12);
 			cnt = 0;
 		}
 	}

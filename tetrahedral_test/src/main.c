@@ -29,7 +29,7 @@ int main(void) {
 
 	int16_t gyro[3] = { 0 };
 	int16_t accel[3] = { 0 };
-	char buffer[64];
+	uint8_t buffer[8] = {'h','e','l','l','o','\0','\0','\0'};
 	while (1) {
 		float gyro_f[3] = { 0 };
 		float accel_f[3] = { 0 };
@@ -42,9 +42,9 @@ int main(void) {
 		accel_f[0] = accel[0] * 3.9E-3f;
 		accel_f[1] = accel[1] * 3.9E-3f;
 		accel_f[2] = accel[2] * 3.9E-3f;
-		sprintf(&buffer[0], "%7lu%7.1f%7.1f%7.1f%6.1f%6.1f%6.1f\r\n", SysTickCounter,gyro_f[0], gyro_f[1], gyro_f[2], accel_f[0], accel_f[1], accel_f[2]);
-		USART_puts(USART2, &buffer[0]);
-
+		//sprintf(&buffer[0], "%7lu%7.1f%7.1f%7.1f%6.1f%6.1f%6.1f\r\n", SysTickCounter,gyro_f[0], gyro_f[1], gyro_f[2], accel_f[0], accel_f[1], accel_f[2]);
+		//USART_puts(USART2, &buffer[0]);
+		SendMessageCan(129, 128, 1, CCI_MESSAGETYPE_EVENT, &buffer[0], 8);
 		Delay(0x3FFFFF);
 	}
 }
