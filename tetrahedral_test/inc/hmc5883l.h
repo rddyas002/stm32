@@ -11,7 +11,7 @@
 #include "i2c.h"
 
 #define HMC5883L_ADDRESS            0x1E // this device only has one address
-#define HMC5883L_DEFAULT_ADDRESS    (HMC5883L_ADDRESS<<1)
+#define HMC5883L_DEFAULT_ADDRESS    (HMC5883L_ADDRESS << 1)
 
 #define HMC5883L_RA_CONFIG_A        0x00
 #define HMC5883L_RA_CONFIG_B        0x01
@@ -74,5 +74,6 @@
 #define HMC5883L_STATUS_READY_BIT   0
 
 void init_mag(I2C_TypeDef* I2Cx);
+void read_mag(I2C_TypeDef* I2Cx, int16_t B[3]);
 
 #endif /* HMC5883L_H_ */

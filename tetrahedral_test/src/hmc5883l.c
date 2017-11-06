@@ -1,42 +1,20 @@
 #include "hmc5883l.h"
 
-void I2Cx_ByteWrite(I2C_TypeDef* I2Cx, u8 slaveAddr, u8* pBuffer, u8 WriteAddr);
-void HMC5883L_SetMode(I2C_TypeDef* I2Cx, uint8_t newMode);
-void HMC5883L_SetGain(I2C_TypeDef* I2Cx, uint8_t gain);
-uint8_t HMC5883L_ReadByte(I2C_TypeDef* I2Cx, u8 slaveAddr, uint8_t address)
-
-uint8_t HMC5883Lmode = 1;
+void HMC5883L_WriteByte(I2C_TypeDef* I2Cx, u8 slaveAddr, uint8_t address, uint8_t data);
+uint8_t HMC5883L_ReadByte(I2C_TypeDef* I2Cx, u8 slaveAddr, uint8_t address);
 
 void init_mag(I2C_TypeDef* I2Cx) {
 	// write CONFIG_A register
-	uint8_t tmp = (HMC5883L_AVERAGING_8
-			<< (HMC5883L_CRA_AVERAGE_BIT - HMC5883L_CRA_AVERAGE_LENGTH + 1))
-			| (HMC5883L_RATE_15
-					<< (HMC5883L_CRA_RATE_BIT - HMC5883L_CRA_RATE_LENGTH + 1))
-			| (HMC5883L_BIAS_NORMAL
-					<< (HMC5883L_CRA_BIAS_BIT - HMC5883L_CRA_BIAS_LENGTH + 1));
-	I2Cx_ByteWrite(I2C1, HMC5883L_DEFAULT_ADDRESS, &tmp, HMC5883L_RA_CONFIG_A);
+	uint8_t tmp = 0b00011100;
+	HMC5883L_WriteByte(I2C1, HMC5883L_DEFAULT_ADDRESS, tmp, HMC5883L_RA_CONFIG_A);
 
 	// write CONFIG_B register
-	HMC5883L_SetGain(I2C1, HMC5883L_GAIN_1090);
+	tmp = 0b00100000;
+	HMC5883L_WriteByte(I2Cx, HMC5883L_DEFAULT_ADDRESS, tmp, HMC5883L_RA_CONFIG_B);
 
 	// write MODE register
-	HMC5883L_SetMode(I2C1, HMC5883L_MODE_SINGLE);
-}
-
-void HMC5883L_SetGain(I2C_TypeDef* I2Cx, uint8_t gain) {
-	// use this method to guarantee that bits 4-0 are set to zero, which is a
-	// requirement specified in the datasheet;
-	uint8_t tmp = gain << (HMC5883L_CRB_GAIN_BIT - HMC5883L_CRB_GAIN_LENGTH + 1);
-	I2Cx_ByteWrite(I2Cx, HMC5883L_DEFAULT_ADDRESS, &tmp, HMC5883L_RA_CONFIG_B);
-}
-
-void HMC5883L_SetMode(I2C_TypeDef* I2Cx, uint8_t newMode) {
-	// use this method to guarantee that bits 7-2 are set to zero, which is a
-	// requirement specified in the datasheet;
-	uint8_t tmp = HMC5883Lmode << (HMC5883L_MODEREG_BIT - HMC5883L_MODEREG_LENGTH + 1);
-	I2Cx_ByteWrite(I2Cx, HMC5883L_DEFAULT_ADDRESS, &tmp, HMC5883L_RA_MODE);
-	HMC5883Lmode = newMode; // track to tell if we have to clear bit 7 after a read
+	tmp = 0b0;
+	HMC5883L_WriteByte(I2Cx, HMC5883L_DEFAULT_ADDRESS, tmp, HMC5883L_RA_MODE);
 }
 
 void HMC5883L_WriteByte(I2C_TypeDef* I2Cx, u8 slaveAddr, uint8_t address, uint8_t data) {
@@ -124,4 +102,19 @@ uint8_t HMC5883L_ReadByte(I2C_TypeDef* I2Cx, u8 slaveAddr, uint8_t address) {
 	I2C_AcknowledgeConfig(I2Cx, ENABLE);
 
 	return ret;
+}
+
+void read_mag(I2C_TypeDef* I2Cx, int16_t B[3]) {
+	// Read x
+	B[0] = HMC5883L_ReadByte(I2C1, HMC5883L_DEFAULT_ADDRESS, 0x03) << 8;
+	B[0] |= HMC5883L_ReadByte(I2C1, HMC5883L_DEFAULT_ADDRESS, 0x04);
+
+	// Read y
+	B[1] = HMC5883L_ReadByte(I2C1, HMC5883L_DEFAULT_ADDRESS, 0x07) << 8;
+	B[1] |= HMC5883L_ReadByte(I2C1, HMC5883L_DEFAULT_ADDRESS, 0x08);
+
+	// Read z
+	B[2] = HMC5883L_ReadByte(I2C1, HMC5883L_DEFAULT_ADDRESS, 0x05) << 8;
+	B[2] |= HMC5883L_ReadByte(I2C1, HMC5883L_DEFAULT_ADDRESS, 0x06);
+
 }

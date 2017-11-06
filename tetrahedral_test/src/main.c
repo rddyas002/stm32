@@ -31,12 +31,14 @@ int main(void) {
 
 	int16_t gyro[3] = { 0 };
 	int16_t accel[3] = { 0 };
+	int16_t mag[3] = { 0 };
 	uint8_t buffer[8] = {'h','e','l','l','o','\0','\0','\0'};
 	while (1) {
 		float gyro_f[3] = { 0 };
 		float accel_f[3] = { 0 };
 		read_gyro(I2C1, gyro);
 		read_accel(I2C1, accel);
+		read_mag(I2C1, mag);
 
 		gyro_f[0] = gyro[0] * 70E-3f;
 		gyro_f[1] = gyro[1] * 70E-3f;
