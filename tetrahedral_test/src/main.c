@@ -8,6 +8,7 @@
 #include "adxl345.h"
 #include "usart.h"
 #include "gpio.h"
+#include "CciProtocol.h"
 
 __IO uint32_t SysTickCounter;
 void SysTick_Handler(void){
@@ -23,6 +24,7 @@ int main(void) {
 	init_accel(I2C1);
 	init_gpio();
 	init_USART2(115200);
+	init_cci(129);
 	SysTick_Config(SystemCoreClock/1000);
 
 	int16_t gyro[3] = { 0 };

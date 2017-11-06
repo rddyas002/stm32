@@ -97,6 +97,15 @@ void USART_puts(USART_TypeDef* USARTx, volatile char *s){
 	}
 }
 
+void USART_send(USART_TypeDef* USARTx, uint8_t *s, uint8_t length){
+	uint8_t count = 0;
+	while(count++ != length){
+		// wait until data register is empty
+		while(!(USARTx->SR & 0x00000040) );
+		USART_SendData(USARTx, *s++);
+	}
+}
+
 void USART1_IRQHandler(void){
 
 	// check if the USART1 receive interrupt flag was set
