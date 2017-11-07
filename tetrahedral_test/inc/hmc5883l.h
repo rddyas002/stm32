@@ -74,6 +74,6 @@
 #define HMC5883L_STATUS_READY_BIT   0
 
 void init_mag(I2C_TypeDef* I2Cx);
-void read_mag(I2C_TypeDef* I2Cx, int16_t B[3]);
+float read_mag(I2C_TypeDef* I2Cx, float B_f[3]);
 
 #endif /* HMC5883L_H_ */
