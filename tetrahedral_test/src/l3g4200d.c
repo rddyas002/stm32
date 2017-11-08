@@ -26,7 +26,7 @@ float read_gyro(I2C_TypeDef* I2Cx, float gyro_f[3]){
 	uint8_t rx_data2[6] = {0};
 	uint8_t rx_data[6] = {0};
 
-	//I2C_ReadBytes(I2Cx, GYRO_ADDRESS << 1, 0x28, &rx_data2[0], 6);
+	//I2C_ReadBytes(I2Cx, GYRO_ADDRESS << 1, 0x28 | 0x80, &rx_data2[0], 6);
 
 	for (i = 0; i < 6; i++){
 		rx_data[i] = I2C_ReadByte(I2Cx, GYRO_ADDRESS << 1, 0x28 + i);
