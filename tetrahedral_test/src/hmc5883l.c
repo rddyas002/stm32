@@ -2,7 +2,6 @@
 
 void HMC5883L_WriteByte(I2C_TypeDef* I2Cx, u8 slaveAddr, uint8_t address, uint8_t data);
 uint8_t HMC5883L_ReadByte(I2C_TypeDef* I2Cx, u8 slaveAddr, uint8_t address);
-void HMC5883L_ReadBytes(I2C_TypeDef* I2Cx, u8 slaveAddr, uint8_t startAddress, uint8_t * data, uint8_t bytes);
 
 #define HMC5883L_GAIN 0.92f
 
@@ -10,14 +9,17 @@ void init_mag(I2C_TypeDef* I2Cx) {
 	// write CONFIG_A register
 	uint8_t tmp = 0b00011100;
 	HMC5883L_WriteByte(I2Cx, HMC5883L_DEFAULT_ADDRESS, HMC5883L_RA_CONFIG_A, tmp);
+	Delay(100000);
 
 	// write CONFIG_B register
 	tmp = 0b00100000;
 	HMC5883L_WriteByte(I2Cx, HMC5883L_DEFAULT_ADDRESS, HMC5883L_RA_CONFIG_B, tmp);
+	Delay(100000);
 
 	// write MODE register
 	tmp = 0b0;
 	HMC5883L_WriteByte(I2Cx, HMC5883L_DEFAULT_ADDRESS, HMC5883L_RA_MODE, tmp);
+	Delay(100000);
 }
 
 void HMC5883L_WriteByte(I2C_TypeDef* I2Cx, u8 slaveAddr, uint8_t address, uint8_t data) {
@@ -124,9 +126,9 @@ float read_mag(I2C_TypeDef* I2Cx, float B_f[3]) {
 
 	float B_mag = sqrt(B_f[0]*B_f[0] + B_f[1]*B_f[1] + B_f[2]*B_f[2]);
 
-	B_f[0] /= B_mag;
-	B_f[1] /= B_mag;
-	B_f[2] /= B_mag;
+	B_f[0] /= 1e1;//B_mag;
+	B_f[1] /= 1e1;//B_mag;
+	B_f[2] /= 1e1;//B_mag;
 
 	return B_mag;
 }

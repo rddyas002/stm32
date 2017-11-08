@@ -1,6 +1,8 @@
 #include "adxl345.h"
+#include <math.h>
 
 #define ACCEL_ADDRESS	(unsigned char)0x53
+#define ADXL345_GAIN	(3.9E-3f)
 
 void init_accel(I2C_TypeDef* I2Cx){
 	char config[2] = {0};
@@ -22,17 +24,23 @@ void init_accel(I2C_TypeDef* I2Cx){
 	I2C_stop(I2Cx);
 }
 
-void read_accel(I2C_TypeDef* I2Cx, int16_t accel[3]){
-	int i;
-	char rx_data[6] = {0};
+float read_accel(I2C_TypeDef* I2Cx, float accel_f[3]){
+	uint8_t rx_data[6] = {0};
+	int16_t accel[3] = {0};
 
-	for (i = 0; i < 6; i++){
-		rx_data[i] = read_register(I2C1, ACCEL_ADDRESS, 0x32 + i);
-		Delay(100000);
-	}
+	I2C_ReadBytes(I2C1, ACCEL_ADDRESS << 1, 0x32, &rx_data[0], 6);
+
 	accel[0] = (int16_t)(((uint16_t)rx_data[1] << 8) | (uint16_t)rx_data[0]);
 	accel[1] = (int16_t)(((uint16_t)rx_data[3] << 8) | (uint16_t)rx_data[2]);
 	accel[2] = (int16_t)(((uint16_t)rx_data[5] << 8) | (uint16_t)rx_data[4]);
+
+	accel_f[0] = (float)accel[0]*ADXL345_GAIN;
+	accel_f[1] = (float)accel[1]*ADXL345_GAIN;
+	accel_f[2] = (float)accel[2]*ADXL345_GAIN;
+
+	float A_mag = sqrt(accel_f[0]*accel_f[0] + accel_f[1]*accel_f[1] + accel_f[2]*accel_f[2]);
+
+	return A_mag;
 }
 
 void L3G4200D_I2C_BufferRead(I2C_TypeDef* I2Cx, u8 slAddr, u8* pBuffer, u8 ReadAddr, u16 NumByteToRead)

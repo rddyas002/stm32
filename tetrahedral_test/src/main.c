@@ -31,28 +31,19 @@ int main(void) {
 	init_cci(129);
 	SysTick_Config(SystemCoreClock/1000);
 
-	int16_t gyro[3] = { 0 };
-	int16_t accel[3] = { 0 };
-	int16_t mag[3] = { 0 };
 	uint8_t buffer[128];// = {'h','e','l','l','o','\0','\0','\0'};
 	while (1) {
 		float gyro_f[3] = { 0 };
 		float accel_f[3] = { 0 };
 		float mag_f[3] = { 0 };
-		read_gyro(I2C1, gyro);
-		read_accel(I2C1, accel);
+		float w = read_gyro(I2C1, gyro_f);
+		float G = read_accel(I2C1, accel_f);
 		float B_mag = read_mag(I2C1, mag_f)*1e-1;	// uT
 
-		gyro_f[0] = gyro[0] * 70E-3f;
-		gyro_f[1] = gyro[1] * 70E-3f;
-		gyro_f[2] = gyro[2] * 70E-3f;
-		accel_f[0] = accel[0] * 3.9E-3f;
-		accel_f[1] = accel[1] * 3.9E-3f;
-		accel_f[2] = accel[2] * 3.9E-3f;
-		sprintf(&buffer[0], "%7lu%7.1f%7.1f%7.1f%6.1f%6.1f%6.1f%7.1f%7.1f%7.1f%7.1fuT\r\n",
+		sprintf(&buffer[0], "%7lu%7.1f%7.1f%7.1f%7.1f%6.1f%6.1f%6.1f%6.1f%7.1f%7.1f%7.1f%7.1fuT\r\n",
 				SysTickCounter,
-				gyro_f[0], gyro_f[1], gyro_f[2],
-				accel_f[0], accel_f[1], accel_f[2],
+				gyro_f[0], gyro_f[1], gyro_f[2], w,
+				accel_f[0], accel_f[1], accel_f[2], G,
 				mag_f[0], mag_f[1], mag_f[2], B_mag);
 		USART_puts(USART2, &buffer[0]);
 		//SendMessageCan(129, 128, 1, CCI_MESSAGETYPE_EVENT, &buffer[0], 8);
