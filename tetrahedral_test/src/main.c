@@ -36,7 +36,8 @@ int main(void) {
 		float gyro_f[3] = { 0 };
 		float accel_f[3] = { 0 };
 		float mag_f[3] = { 0 };
-		float w = read_gyro(I2C1, gyro_f);
+		int8_t temperature;
+		float w = read_gyro(I2C1, gyro_f, &temperature);
 		float G = read_accel(I2C1, accel_f);
 		float B_mag = read_mag(I2C1, mag_f)*1e-1;	// uT
 

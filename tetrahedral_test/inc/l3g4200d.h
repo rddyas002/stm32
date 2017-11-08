@@ -11,6 +11,6 @@
 #include "i2c.h"
 
 void init_gyro(I2C_TypeDef* I2Cx);
-float read_gyro(I2C_TypeDef* I2Cx, float gyro_f[3]);
+float read_gyro(I2C_TypeDef* I2Cx, float gyro_f[3], int8_t * temperature);
 
 #endif /* L3G4200D_H_ */
