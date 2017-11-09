@@ -34,9 +34,9 @@ float read_accel(I2C_TypeDef* I2Cx, float accel_f[3]){
 	accel[1] = (int16_t)(((uint16_t)rx_data[3] << 8) | (uint16_t)rx_data[2]);
 	accel[2] = (int16_t)(((uint16_t)rx_data[5] << 8) | (uint16_t)rx_data[4]);
 
-	accel_f[0] = (float)accel[0]*ADXL345_GAIN;
-	accel_f[1] = (float)accel[1]*ADXL345_GAIN;
-	accel_f[2] = (float)accel[2]*ADXL345_GAIN;
+	accel_f[0] = (float)accel[0]*-ADXL345_GAIN;
+	accel_f[1] = (float)accel[1]*-ADXL345_GAIN;
+	accel_f[2] = (float)accel[2]*-ADXL345_GAIN;
 
 	float A_mag = sqrt(accel_f[0]*accel_f[0] + accel_f[1]*accel_f[1] + accel_f[2]*accel_f[2]);
 

@@ -13,10 +13,24 @@
 #define ARM_MATH_CM4
 #include "arm_math.h"
 
-__IO uint32_t SysTickCounter;
+__IO uint32_t SysTickCounter = 0;
+__IO int32_t DelayCounter = 0;
 void SysTick_Handler(void){
 	SysTickCounter++;
+	DelayCounter--;
 }
+
+void msDelaySysTick(uint32_t count_ms){
+	DelayCounter = count_ms;
+	while (DelayCounter > 0);
+}
+
+typedef struct{
+	float rate[3];			// dps
+	float acceleration[3];	// g
+	float magnetic[3];		// uT
+	float time;
+}__attribute__((packed)) imu_data_s;
 
 int main(void) {
 	// enable FPU full access
@@ -31,23 +45,15 @@ int main(void) {
 	init_cci(129);
 	SysTick_Config(SystemCoreClock/1000);
 
-	uint8_t buffer[128];// = {'h','e','l','l','o','\0','\0','\0'};
+	imu_data_s imu_data;
 	while (1) {
-		float gyro_f[3] = { 0 };
-		float accel_f[3] = { 0 };
-		float mag_f[3] = { 0 };
 		int8_t temperature;
-		float w = read_gyro(I2C1, gyro_f, &temperature);
-		float G = read_accel(I2C1, accel_f);
-		float B_mag = read_mag(I2C1, mag_f)*1e-1;	// uT
-
-		sprintf(&buffer[0], "%7lu%7.1f%7.1f%7.1f%7.1f%6.1f%6.1f%6.1f%6.1f%7.1f%7.1f%7.1f%7.1fuT\r\n",
-				SysTickCounter,
-				gyro_f[0], gyro_f[1], gyro_f[2], w,
-				accel_f[0], accel_f[1], accel_f[2], G,
-				mag_f[0], mag_f[1], mag_f[2], B_mag);
-		USART_puts(USART2, &buffer[0]);
-		//SendMessageCan(129, 128, 1, CCI_MESSAGETYPE_EVENT, &buffer[0], 8);
-		Delay(0x3FFFFF);
+		read_gyro(I2C1, imu_data.rate, &temperature);
+		read_accel(I2C1, imu_data.acceleration);
+		read_mag(I2C1, imu_data.magnetic);	// uT
+		imu_data.time = (float)SysTickCounter*1.0e-3f;
+		USART_send(USART2, (uint8_t *) &imu_data, sizeof(imu_data_s));
+		GPIO_ToggleBits(GPIOD, GPIO_Pin_12);
+		msDelaySysTick(100);
 	}
 }

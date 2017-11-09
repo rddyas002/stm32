@@ -7,6 +7,14 @@
 #include <stdbool.h>
 #include <unistd.h>
 #include <windows.h>
+#include <stdint.h>
+
+typedef struct{
+	float rate[3];			// dps
+	float acceleration[3];	// g
+	float magnetic[3];		// uT
+	float time;
+}__attribute__((packed)) imu_data_s;
 
 static volatile int keepRunning = 1;
 void intHandler(int dummy) {
@@ -37,7 +45,7 @@ int openSerialComms(HANDLE hSerial){
 	}
 
 	// Set COM port timeout settings
-	timeouts.ReadIntervalTimeout = 50;
+	timeouts.ReadIntervalTimeout = 500;
 	timeouts.ReadTotalTimeoutConstant = 50;
 	timeouts.ReadTotalTimeoutMultiplier = 10;
 	timeouts.WriteTotalTimeoutConstant = 50;
@@ -72,9 +80,9 @@ int sendSerialComms(HANDLE hSerial, char * data, char length){
 	return 0;
 }
 
-DWORD readSerialComms(HANDLE hSerial, char * data){
+DWORD readSerialComms(HANDLE hSerial, uint8_t * data, uint16_t length){
 	DWORD bytes_read;
-	if(!ReadFile(hSerial, data, 11, &bytes_read, NULL)){
+	if(!ReadFile(hSerial, data, length, &bytes_read, NULL)){
 		fprintf(stderr, "Error\n");
 		CloseHandle(hSerial);
 		return 1;
@@ -111,17 +119,18 @@ int main(int argc, char *argv[]){
 
 	struct timespec transmit_time;
 	struct timespec receive_time;
-	char received_bytes[64];
+	uint8_t received_bytes[64];
+	imu_data_s imu_data;
+	int counter = 0;
 	while(keepRunning){
-		// send 16 bytes
-		clock_gettime(CLOCK_MONOTONIC, &transmit_time);
-		sendSerialComms(hSerial, &bytes_to_send[0], 11);
-		// wait for data return
-		DWORD len = readSerialComms(hSerial, &received_bytes[0]);
-		clock_gettime(CLOCK_MONOTONIC, &receive_time);
-		double delta_t = (receive_time.tv_sec - transmit_time.tv_sec) + (double)(receive_time.tv_nsec - transmit_time.tv_nsec)/1e9;
-		printf("dt: %6.0fms\n", delta_t*1e3);
-		sleep(1);
+		DWORD len = readSerialComms(hSerial, &received_bytes[0], 40);
+		PurgeComm(hSerial, PURGE_RXCLEAR|PURGE_TXCLEAR);
+		memcpy(&imu_data, &received_bytes[0], 40);
+		printf("%7.1f|%7.1f%7.1f%7.1f|%7.1f%7.1f%7.1f|%7.1f%7.1f%7.1f\r\n",
+					imu_data.time,
+					imu_data.rate[0], imu_data.rate[1], imu_data.rate[2],
+					imu_data.acceleration[0], imu_data.acceleration[1], imu_data.acceleration[2],
+					imu_data.magnetic[0], imu_data.magnetic[1], imu_data.magnetic[2]);
 	}
 
 	closeSerialComms(hSerial);

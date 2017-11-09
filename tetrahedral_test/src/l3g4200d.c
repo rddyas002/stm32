@@ -27,9 +27,9 @@ float read_gyro(I2C_TypeDef* I2Cx, float gyro_f[3], int8_t * temperature){
 	I2C_ReadBytes(I2Cx, GYRO_ADDRESS << 1, 0x28|0x80, &rx_data[0], 8);
 	*temperature = (int8_t)rx_data[0];
 
-	gyro[0] = (int16_t)(((uint16_t)rx_data[3] << 8) | (uint16_t)rx_data[2]);
-	gyro[1] = (int16_t)(((uint16_t)rx_data[5] << 8) | (uint16_t)rx_data[4]);
-	gyro[2] = (int16_t)(((uint16_t)rx_data[7] << 8) | (uint16_t)rx_data[6]);
+	gyro[0] = (int16_t)(((uint16_t)rx_data[7] << 8) | (uint16_t)rx_data[6]);
+	gyro[1] = (int16_t)(((uint16_t)rx_data[3] << 8) | (uint16_t)rx_data[2]);
+	gyro[2] = (int16_t)(((uint16_t)rx_data[5] << 8) | (uint16_t)rx_data[4]);
 
 	gyro_f[0] = (float)gyro[0]*GYRO_GAIN;
 	gyro_f[1] = (float)gyro[1]*GYRO_GAIN;
