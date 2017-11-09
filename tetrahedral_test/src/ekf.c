@@ -51,6 +51,13 @@ void init_ekf(void){
 		R_f32[i][i] = 7.6147e-05f;
 	for (i = 3; i < 6; i++)
 		R_f32[i][i] = 8.4521e-04f;
+
+
+	arm_matrix_instance_f32 P_mat_f32;
+	arm_matrix_instance_f32 Pinv_mat_f32;
+	arm_mat_init_f32(Pinv_mat_f32,7,7,&P0_f32[0]);
+
+	arm_mat_inverse_f32(pSrc, pDst);
 }
 
 void run_ekf(float Ts, float gyro[3], float accel[3], float magnetic[3], float * q, float * w){
@@ -270,6 +277,11 @@ void updateStateAndCovariance(float32_t x[7], float32_t P[7][7], const float32_t
 	float32_t q_tmp[4];
 	memcpy(&q_tmp[0], &x[0], 4);
 	q2R(R, q_tmp);				// use first 4 components
+
+	// compute H
+	// compute Kalman gain
+	// correct state
+	// update covariance
 }
 
 void q2R(float32_t R[3][3], const float32_t q[4]){
