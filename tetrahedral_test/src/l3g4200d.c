@@ -20,23 +20,16 @@ void init_gyro(I2C_TypeDef* I2Cx){
 	ret = I2C_WriteByte(I2Cx, GYRO_ADDRESS << 1, 0x23, 0x30);
 }
 
-float read_gyro(I2C_TypeDef* I2Cx, float gyro_f[3]){
-	int i;
+float read_gyro(I2C_TypeDef* I2Cx, float gyro_f[3], int8_t * temperature){
 	int16_t gyro[3] = {0};
-	uint8_t rx_data2[6] = {0};
-	uint8_t rx_data[6] = {0};
+	uint8_t rx_data[8] = {0};
 
-	//I2C_ReadBytes(I2Cx, GYRO_ADDRESS << 1, 0x28 | 0x80, &rx_data2[0], 6);
+	I2C_ReadBytes(I2Cx, GYRO_ADDRESS << 1, 0x28|0x80, &rx_data[0], 8);
+	*temperature = (int8_t)rx_data[0];
 
-	for (i = 0; i < 6; i++){
-		rx_data[i] = I2C_ReadByte(I2Cx, GYRO_ADDRESS << 1, 0x28 + i);
-		Delay(200000);
-	}
-
-
-	gyro[0] = (int16_t)(((uint16_t)rx_data[1] << 8) | (uint16_t)rx_data[0]);
-	gyro[1] = (int16_t)(((uint16_t)rx_data[3] << 8) | (uint16_t)rx_data[2]);
-	gyro[2] = (int16_t)(((uint16_t)rx_data[5] << 8) | (uint16_t)rx_data[4]);
+	gyro[0] = (int16_t)(((uint16_t)rx_data[3] << 8) | (uint16_t)rx_data[2]);
+	gyro[1] = (int16_t)(((uint16_t)rx_data[5] << 8) | (uint16_t)rx_data[4]);
+	gyro[2] = (int16_t)(((uint16_t)rx_data[7] << 8) | (uint16_t)rx_data[6]);
 
 	gyro_f[0] = (float)gyro[0]*GYRO_GAIN;
 	gyro_f[1] = (float)gyro[1]*GYRO_GAIN;
