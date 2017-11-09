@@ -23,7 +23,7 @@ float32_t x0_f32[] =
 };
 
 float32_t Q_f32[6][6];
-
+float32_t R_f32[6][6];
 float32_t x_f32[7];
 float32_t P_f32[7][7];
 
@@ -33,42 +33,33 @@ void q2R(float32_t R[3][3], const float32_t q[4]);
 void computeF(float32_t F[7][7], const float32_t Ts, const float32_t x[7], const float32_t u[3]);
 void propagateState(float32_t x[7], const float32_t u[3], const float32_t Ts);
 void computeW(float32_t W[7][6], const float32_t Ts, const float32_t x[7]);
-void propagateCovariance(float32_t P[7][7], const float32_t F[7][7], const float32_t W[7][6], const float32_t Q[6][6]);
+void propagateCovariance(float32_t P[7][7], const float32_t Ts, const float32_t gyro[3], const float32_t Q[6][6]);
+void updateStateAndCovariance(float32_t x[7], float32_t P[7][7], const float32_t R[6][6]);
 
 // initialise variables
 void init_ekf(void){
-	int i,j;
-	for (i = 0; i < 7; i++){
-		for (j = 0; j < 7; j++){
-			P_f32[i][j] = 0.1;
-		}
-	}
+	int i;
+	for (i = 0; i < 7; i++)
+		P_f32[i][i] = 0.1;
 	for (i = 0; i < 7; i++)
 		x_f32[i] = x0_f32[i];
 	for (i = 0; i < 3; i++)
 		Q_f32[i][i] = 1.3539e-6f;
 	for (i = 3; i < 6; i++)
 		Q_f32[i][i] = 3.3846e-17f;
-
+	for (i = 0; i < 3; i++)
+		R_f32[i][i] = 7.6147e-05f;
+	for (i = 3; i < 6; i++)
+		R_f32[i][i] = 8.4521e-04f;
 }
 
 void run_ekf(float Ts, float gyro[3], float accel[3], float magnetic[3], float * q, float * w){
-	float32_t R[3][3];
-	float32_t F[7][7];
-	float32_t W[7][6];
-	float32_t q_tmp[4];
-
 	// propagate state
 	propagateState(x_f32, gyro, Ts);
-	memcpy(&q_tmp[0], &x_f32[0], 4);
-	q2R(R, q_tmp);		// use first 4 components
-
 	// propagate covariance
-	// compute F and W
-	computeF(F, Ts, x_f32, gyro);
-	computeW(W, Ts, x_f32);
-	// propagate covariance matrix
-	propagateCovariance(P_f32, F, W, Q_f32);
+	propagateCovariance(P_f32, Ts, gyro, Q_f32);
+	// update phase
+	updateStateAndCovariance(x_f32, P_f32, R_f32);
 }
 
 void propagateState(float32_t x[7], const float32_t u[3], const float32_t Ts){
@@ -225,13 +216,18 @@ void computeW(float32_t W[7][6], const float32_t Ts, const float32_t x[7]){
 	W[6][5] = 1.0f;
 }
 
-void propagateCovariance(float32_t P[7][7], const float32_t F[7][7], const float32_t W[7][6], const float32_t Q[6][6]){
+void propagateCovariance(float32_t P[7][7], const float32_t Ts, const float32_t gyro[3], const float32_t Q[6][6]){
 	int i,j,k;
+	float32_t F[7][7];
+	float32_t W[7][6];
 	float32_t FP[7][6] = {{0},{0}};
 	float32_t FPFt[7][7] = {{0},{0}};
 	float32_t WQ[7][6] = {{0},{0}};
 	float32_t WQWt[7][7] = {{0},{0}};
 	float32_t sum_fp, sum_wq;
+
+	computeF(F, Ts, x_f32, gyro);
+	computeW(W, Ts, x_f32);
 
 	// P = F*P*F' + W*Q*W'
 
@@ -268,6 +264,12 @@ void propagateCovariance(float32_t P[7][7], const float32_t F[7][7], const float
 	for (i = 0; i < 7; i++)
 		for (j = 0; j < 7; j++)
 			P[i][j] = FPFt[i][j] + WQWt[i][j];
+}
+
+void updateStateAndCovariance(float32_t x[7], float32_t P[7][7], const float32_t R[6][6]){
+	float32_t q_tmp[4];
+	memcpy(&q_tmp[0], &x[0], 4);
+	q2R(R, q_tmp);				// use first 4 components
 }
 
 void q2R(float32_t R[3][3], const float32_t q[4]){
