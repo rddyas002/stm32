@@ -10,8 +10,7 @@
 #include "usart.h"
 #include "gpio.h"
 #include "CciProtocol.h"
-#define ARM_MATH_CM4
-#include "arm_math.h"
+#include "ekf.h"
 
 __IO uint32_t SysTickCounter = 0;
 __IO int32_t DelayCounter = 0;
@@ -43,6 +42,7 @@ int main(void) {
 	init_gpio();
 	init_USART2(115200);
 	init_cci(129);
+	init_ekf();
 	SysTick_Config(SystemCoreClock/1000);
 
 	imu_data_s imu_data;
