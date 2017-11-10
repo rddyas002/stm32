@@ -126,9 +126,9 @@ float read_mag(I2C_TypeDef* I2Cx, float B_f[3]) {
 
 	float B_mag = sqrt(B_f[0]*B_f[0] + B_f[1]*B_f[1] + B_f[2]*B_f[2]);
 
-	B_f[0] /= 1e1;//B_mag;
-	B_f[1] /= 1e1;//B_mag;
-	B_f[2] /= 1e1;//B_mag;
+	B_f[0] /= B_mag;//1e1;//B_mag;
+	B_f[1] /= B_mag;//1e1;//B_mag;
+	B_f[2] /= B_mag;//1e1;//B_mag;
 
 	return B_mag;
 }

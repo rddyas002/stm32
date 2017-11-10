@@ -40,6 +40,10 @@ float read_accel(I2C_TypeDef* I2Cx, float accel_f[3]){
 
 	float A_mag = sqrt(accel_f[0]*accel_f[0] + accel_f[1]*accel_f[1] + accel_f[2]*accel_f[2]);
 
+	accel_f[0] /= A_mag;
+	accel_f[1] /= A_mag;
+	accel_f[2] /= A_mag;
+
 	return A_mag;
 }
 
