@@ -74,25 +74,25 @@ int main(void) {
 	init_USART2(115200);
 	init_cci(129);
 	computeInitMeasurementFrame(average_imu);
-	average_imu[0] = 0;
-	average_imu[1] = 0;
-	average_imu[2] = 1;
-	average_imu[3] = 0.5773503;
-	average_imu[4] = 0.5773503;
-	average_imu[5] = 0.5773503;
 	init_ekf(average_imu);
 
 	imu_data_s imu_data;
+	float32_t ypr[3] = {0};
 	char buffer[128];
-	float32_t w_f[3] = {1,1,1};
 	while (1) {
 		int8_t temperature;
 		read_gyro(I2C1, imu_data.rate, &temperature);
 		read_accel(I2C1, imu_data.acceleration);
 		read_mag(I2C1, imu_data.magnetic);	// uT
 		imu_data.time = (float)SysTickCounter*1.0e-3f;
-		run_ekf(1e-2, w_f, imu_data.acceleration, imu_data.magnetic, &q[0], &w[0]);
-		sprintf(&buffer[0], "%4.1f,%4.1f,%4.1f,%4.1f|%4.1f,%4.1f,%4.1f\r\n\0", q[0], q[1], q[2], q[3], w[0]*180/M_PI, w[1]*180/M_PI, w[2]*180/M_PI);
+		run_ekf(0.1, imu_data.rate, imu_data.acceleration, imu_data.magnetic, &q[0], &w[0]);
+		imu_data.time = (float)SysTickCounter*1.0e-3f;
+		ypr[0] = atan2(2.0f*q[2]*q[3] + 2.0f*q[0]*q[1], q[3]*q[3] - q[2]*q[2] - q[1]*q[1] + q[0]*q[0])*180.0f/M_PI_f;
+		ypr[1] = -asin(2.0f*q[1]*q[3] - 2.0f*q[0]*q[2])*180.0f/M_PI_f;
+		ypr[2] = atan2(2.0f*q[1]*q[2] + 2.0f*q[0]*q[3], q[1]*q[1] + q[0]*q[0] - q[3]*q[3] - q[2]*q[2])*180.0f/M_PI_f;
+		//q2ypr(q, ypr);
+		//sprintf(&buffer[0], "%5.2f,%5.2f,%5.2f,%5.2f|%5.2f,%5.2f,%5.2f\r\n", q[0], q[1], q[2], q[3], w[0]*180/M_PI, w[1]*180/M_PI, w[2]*180/M_PI);
+		sprintf(&buffer[0], "%5.2f,%5.2f,%5.2f|%5.2f,%5.2f,%5.2f\r\n", ypr[0], ypr[1], ypr[2], w[0]*180/M_PI, w[1]*180/M_PI, w[2]*180/M_PI);
 		USART_puts(USART2, &buffer[0]);
 		//USART_send(USART2, (uint8_t *) &imu_data, sizeof(imu_data_s));
 		GPIO_ToggleBits(GPIOD, GPIO_Pin_12);

@@ -67,12 +67,14 @@ void init_ekf(float32_t ywf[6]){
 void run_ekf(float Ts, float gyro[3], float accel[3], float magnetic[3], float * q, float * w){
 	float32_t y[6];
 
-	y[0] = accel[0];
-	y[1] = accel[1];
-	y[2] = accel[2];
-	y[3] = magnetic[0];
-	y[4] = magnetic[1];
-	y[5] = magnetic[2];
+	float accel_norm = sqrt(accel[0]*accel[0] + accel[1]*accel[1] + accel[2]*accel[2]);
+	float mag_norm = sqrt(magnetic[0]*magnetic[0] + magnetic[1]*magnetic[1] + magnetic[2]*magnetic[2]);
+	y[0] = accel[0]/accel_norm;
+	y[1] = accel[1]/accel_norm;
+	y[2] = accel[2]/accel_norm;
+	y[3] = magnetic[0]/mag_norm;
+	y[4] = magnetic[1]/mag_norm;
+	y[5] = magnetic[2]/mag_norm;
 
 	// propagate state
 	propagateState(x_f32_a, gyro, Ts);
@@ -487,6 +489,12 @@ void q2R(float32_t R[3][3], const float32_t q[4]){
 	R[2][0] = 2.0f*(q[1]*q[3] + q[0]*q[2]);
 	R[2][1] = 2.0f*(q[2]*q[3] - q[0]*q[1]);
 	R[2][2] = q[0]*q[0] - q[1]*q[1] - q[2]*q[2] - q[3]*q[3];
+}
+
+void q2ypr(float32_t q[4], float32_t ypr[3]){
+	ypr[0] = atan2(2.0f*q[2]*q[3] + 2.0f*q[0]*q[1], q[3]*q[3] - q[2]*q[2] - q[1]*q[1] + q[0]*q[0])*180.0f/M_PI_f;
+	ypr[1] = -asin(2.0f*q[1]*q[3] - 2.0f*q[0]*q[2])*180.0f/M_PI_f;
+	ypr[2] = atan2(2.0f*q[1]*q[2] + 2.0f*q[0]*q[3], q[1]*q[1] + q[0]*q[0] - q[3]*q[3] - q[2]*q[2])*180.0f/M_PI_f;
 }
 
 void v32f_sub(float32_t y[3], const float32_t a[3], const float32_t b[3]){
