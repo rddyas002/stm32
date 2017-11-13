@@ -46,41 +46,47 @@ void updateCovariance(float32_t P[7][7], float32_t K[7][6], float32_t H[6][7]);
 void crossProduct3(float32_t a[3], float32_t b[3], float32_t c[3]);
 
 // initialise variables
-void init_ekf(float32_t ywf[6]){
+void init_ekf(imu_data_s * imu_data){
 	int i;
 	for (i = 0; i < 7; i++)
 		P_f32_a[i][i] = 0.1;
 	for (i = 0; i < 7; i++)
 		x_f32_a[i] = x0_f32_a[i];
 	for (i = 0; i < 3; i++)
-		Q_f32_a[i][i] = 1.3539e-6f;
+		Q_f32_a[i][i] = imu_data->gyro_var[i];//1.3539e-6f;
 	for (i = 3; i < 6; i++)
 		Q_f32_a[i][i] = 3.3846e-17f;
 	for (i = 0; i < 3; i++)
-		R_f32_a[i][i] = 7.6147e-05f;
+		R_f32_a[i][i] = imu_data->accel_var[i];
 	for (i = 3; i < 6; i++)
-		R_f32_a[i][i] = 8.4521e-04f;
+		R_f32_a[i][i] = imu_data->mag_var[i];
 
-	for (i = 0; i < 6; i++)
-		ywf_f32[i] = ywf[i];
+	for (i = 0; i < 3; i++){
+		ywf_f32[i] = imu_data->accel_offset[i];
+		ywf_f32[i+3] = imu_data->mag_offset[i];
+	}
 }
 
-void run_ekf(float Ts, float gyro[3], float accel[3], float magnetic[3], float * q, float * w){
+void run_ekf(float32_t Ts, float32_t gyro[3], float32_t accel[3], float32_t magnetic[3], float32_t * q, float32_t * w){
 	float32_t y[6];
+	float32_t gyro_rps[3];
 
-	float accel_norm = sqrt(accel[0]*accel[0] + accel[1]*accel[1] + accel[2]*accel[2]);
-	float mag_norm = sqrt(magnetic[0]*magnetic[0] + magnetic[1]*magnetic[1] + magnetic[2]*magnetic[2]);
+	float32_t accel_norm = sqrt(accel[0]*accel[0] + accel[1]*accel[1] + accel[2]*accel[2]);
+	float32_t mag_norm = sqrt(magnetic[0]*magnetic[0] + magnetic[1]*magnetic[1] + magnetic[2]*magnetic[2]);
 	y[0] = accel[0]/accel_norm;
 	y[1] = accel[1]/accel_norm;
 	y[2] = accel[2]/accel_norm;
 	y[3] = magnetic[0]/mag_norm;
 	y[4] = magnetic[1]/mag_norm;
 	y[5] = magnetic[2]/mag_norm;
+	gyro_rps[0] = gyro[0]*M_PI_f/180.0f;
+	gyro_rps[1] = gyro[1]*M_PI_f/180.0f;
+	gyro_rps[2] = gyro[2]*M_PI_f/180.0f;
 
 	// propagate state
-	propagateState(x_f32_a, gyro, Ts);
+	propagateState(x_f32_a, gyro_rps, Ts);
 	// propagate covariance
-	propagateCovariance(P_f32_a, Ts, gyro, Q_f32_a);
+	propagateCovariance(P_f32_a, Ts, gyro_rps, Q_f32_a);
 	// update phase
 	updateStateAndCovariance(x_f32_a, P_f32_a, R_f32_a, y);
 
@@ -512,6 +518,13 @@ void v32f_normalise4(float32_t v[4]){
 	v[3] /= norm;
 }
 
+void normalise3(float32_t r[3]){
+	float32_t norm = sqrt(r[0]*r[0]+r[1]*r[1]+r[2]*r[2]);
+	r[0] /= norm;
+	r[1] /= norm;
+	r[2] /= norm;
+}
+
 void triadComputation(float32_t r1_wf[3], float32_t r2_wf[3], float32_t r1_bf[3], float32_t r2_bf[3], float32_t ypr[3]){
 	// find orthogonal vectors in both frame
 	float32_t r3_wf[3];
@@ -519,6 +532,12 @@ void triadComputation(float32_t r1_wf[3], float32_t r2_wf[3], float32_t r1_bf[3]
 	float32_t r3_bf[3];
 	float32_t r13_bf[3];
 	float32_t Rw2b[3][3];
+
+	normalise3(r1_wf);
+	normalise3(r2_wf);
+	normalise3(r1_bf);
+	normalise3(r2_bf);
+
 	crossProduct3(r1_wf, r2_wf, r3_wf);
 	crossProduct3(r1_wf, r3_wf, r13_wf);	// orthogonal set r1 r13 r3
 	crossProduct3(r1_bf, r2_bf, r3_bf);
@@ -551,9 +570,9 @@ void triadComputation(float32_t r1_wf[3], float32_t r2_wf[3], float32_t r1_bf[3]
 	arm_mat_trans_f32(&wf_m, &wft_m);
 	arm_mat_mult_f32(&bf_m, &wft_m, &R_m);
 
-	ypr[0] = atan2(Rw2b[1][2], Rw2b[2][2]);
-	ypr[1] = -asin(Rw2b[0][2]);
-	ypr[2] = atan2(Rw2b[0][1], Rw2b[0][0]);
+	ypr[0] = atan2(Rw2b[1][2], Rw2b[2][2])*180.0f/M_PI_f;
+	ypr[1] = -asin(Rw2b[0][2])*180.0f/M_PI_f;
+	ypr[2] = atan2(Rw2b[0][1], Rw2b[0][0])*180.0f/M_PI_f;
 }
 
 void crossProduct3(float32_t a[3], float32_t b[3], float32_t c[3]) {

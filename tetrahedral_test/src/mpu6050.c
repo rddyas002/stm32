@@ -7,12 +7,16 @@
 
 #include "MPU6050.h"
 
+#define MPU6050_SCALE_ACCEL 	(16384.0f)
+#define MPU6050_SCALE_GYRO 		(32.8f)
+
 void MPU6050_Initialize(void)
 {
     MPU6050_SetClockSource(MPU6050_CLOCK_PLL_XGYRO);
     MPU6050_SetFullScaleGyroRange(MPU6050_GYRO_FS_1000);
     MPU6050_SetFullScaleAccelRange(MPU6050_ACCEL_FS_2);
     MPU6050_SetSleepModeStatus(DISABLE);
+    MPU6050_SetI2CBypass();
 }
 
 bool MPU6050_TestConnection()
@@ -73,6 +77,12 @@ void MPU6050_SetClockSource(uint8_t source)
 void MPU6050_SetFullScaleGyroRange(uint8_t range)
 {
     MPU6050_WriteBits(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_GYRO_CONFIG, MPU6050_GCONFIG_FS_SEL_BIT, MPU6050_GCONFIG_FS_SEL_LENGTH, range);
+}
+
+void MPU6050_SetI2CBypass(void)
+{
+	MPU6050_WriteBit(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_INT_PIN_CFG, MPU6050_INTCFG_I2C_BYPASS_EN_BIT, 1);
+	MPU6050_WriteBit(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_USER_CTRL, MPU6050_USERCTRL_I2C_MST_EN_BIT, 0);
 }
 
 // GYRO_CONFIG register
@@ -168,9 +178,10 @@ void MPU6050_SetSleepModeStatus(FunctionalState NewState)
  * @param AccelGyro 16-bit signed integer array of length 6
  * @see MPU6050_RA_ACCEL_XOUT_H
  */
-void MPU6050_GetRawAccelGyro(s16* AccelGyro)
+void MPU6050_GetRawAccelGyro(imu_data_s * data)
 {
     u8 tmpBuffer[14];
+    s16 AccelGyro[6] = {0};
     MPU6050_I2C_BufferRead(MPU6050_DEFAULT_ADDRESS, tmpBuffer, MPU6050_RA_ACCEL_XOUT_H, 14);
     /* Get acceleration */
     for (int i = 0; i < 3; i++)
@@ -179,6 +190,18 @@ void MPU6050_GetRawAccelGyro(s16* AccelGyro)
     for (int i = 4; i < 7; i++)
         AccelGyro[i - 1] = ((s16) ((u16) tmpBuffer[2 * i] << 8) + tmpBuffer[2 * i + 1]);
 
+    data->acceleration[0] = -(float32_t)AccelGyro[0] / MPU6050_SCALE_ACCEL;
+    data->acceleration[1] = -(float32_t)AccelGyro[1] / MPU6050_SCALE_ACCEL;
+    data->acceleration[2] = -(float32_t)AccelGyro[2] / MPU6050_SCALE_ACCEL;
+    data->rate[0] = (float32_t)AccelGyro[3] / MPU6050_SCALE_GYRO;
+    data->rate[1] = (float32_t)AccelGyro[4] / MPU6050_SCALE_GYRO;
+    data->rate[2] = (float32_t)AccelGyro[5] / MPU6050_SCALE_GYRO;
+
+    float32_t norm_accel = sqrt(data->acceleration[0]*data->acceleration[0]+data->acceleration[1]*data->acceleration[1]+data->acceleration[2]*data->acceleration[2]);
+    for (int i = 0; i < 3; i++){
+    	data->acceleration[i] /= norm_accel;
+    	data->rate[i] *= (M_PI_f/180.0f);
+    }
 }
 
 /** Write multiple bits in an 8-bit device register.

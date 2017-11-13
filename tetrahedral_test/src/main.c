@@ -15,7 +15,7 @@
 
 float32_t computeMean(float32_t m, float32_t x, float32_t k);
 float32_t computeVariance(float32_t v, float32_t x, float32_t m, float32_t m_k);
-void computeGyroStats(float32_t gyro[3], float32_t accel[3], float32_t mag[3], float32_t gyro_var[3], float32_t accel_var[3], float32_t mag_var[3]);
+void computeGyroStats(imu_data_s * imu_data);
 
 __IO uint32_t SysTickCounter = 0;
 __IO int32_t DelayCounter = 0;
@@ -37,42 +37,41 @@ void msDelaySysTick(uint32_t count_ms){
 	while (DelayCounter > 0);
 }
 
-typedef struct{
-	float rate[3];			// dps
-	float acceleration[3];	// g
-	float magnetic[3];		// uT
-	float time;
-}__attribute__((packed)) imu_data_s;
-
-void computeInitMeasurementFrame(float32_t y[6]){
+void computeInitMeasurementFrame(imu_data_s * imu_data){
 	int i;
-	double measurements[6] = {0};
-	float32_t gyro_var[3] = {0};
-	float32_t accel_var[3] = {0};
-	float32_t mag_var[3] = {0};
-	imu_data_s imu_data;
-	int8_t temperature;
+	double measurements[9] = {0};
 
 	for (i = 0; i < 50; i++){
-		read_gyro(I2C1, imu_data.rate, &temperature);
-		read_accel(I2C1, imu_data.acceleration);
-		read_mag(I2C1, imu_data.magnetic);
-		computeGyroStats(imu_data.rate, imu_data.acceleration, imu_data.magnetic, gyro_var, accel_var, mag_var);
+		MPU6050_GetRawAccelGyro(imu_data);
+		read_mag(I2C1, imu_data->magnetic);
+		computeGyroStats(imu_data);
 		// store data
-		measurements[0] += (double)imu_data.acceleration[0];
-		measurements[1] += (double)imu_data.acceleration[1];
-		measurements[2] += (double)imu_data.acceleration[2];
-		measurements[3] += (double)imu_data.magnetic[0];
-		measurements[4] += (double)imu_data.magnetic[1];
-		measurements[5] += (double)imu_data.magnetic[2];
+		measurements[0] += (double)imu_data->acceleration[0];
+		measurements[1] += (double)imu_data->acceleration[1];
+		measurements[2] += (double)imu_data->acceleration[2];
+		measurements[3] += (double)imu_data->rate[0];
+		measurements[4] += (double)imu_data->rate[1];
+		measurements[5] += (double)imu_data->rate[2];
+		measurements[6] += (double)imu_data->magnetic[0];
+		measurements[7] += (double)imu_data->magnetic[1];
+		measurements[8] += (double)imu_data->magnetic[2];
 		msDelaySysTick(50);
 	}
 
-	for (i = 0; i < 6; i++)
+	for (i = 0; i < 9; i++)
 		measurements[i] /= 50.0;
 
-	for (i = 0; i < 6; i++)
-		y[i] = (float32_t)measurements[i];
+	imu_data->accel_offset[0] = (float32_t)measurements[0];
+	imu_data->accel_offset[1] = (float32_t)measurements[1];
+	imu_data->accel_offset[2] = (float32_t)measurements[2];
+
+	imu_data->gyro_offset[0] = (float32_t)measurements[3];
+	imu_data->gyro_offset[1] = (float32_t)measurements[4];
+	imu_data->gyro_offset[2] = (float32_t)measurements[5];
+
+	imu_data->mag_offset[0] = (float32_t)measurements[6];
+	imu_data->mag_offset[1] = (float32_t)measurements[7];
+	imu_data->mag_offset[2] = (float32_t)measurements[8];
 
 }
 
@@ -84,7 +83,7 @@ float32_t computeVariance(float32_t v, float32_t x, float32_t m, float32_t m_k){
 	return v + (x - m)*(x - m_k);
 }
 
-void computeGyroStats(float32_t gyro[3], float32_t accel[3], float32_t mag[3], float32_t gyro_var[3], float32_t accel_var[3], float32_t mag_var[3]){
+void computeGyroStats(imu_data_s * imu_data){
 	static float32_t m_g[3] = {0};
 	static float32_t v_g[3] = {0};
 	static float32_t m_a[3] = {0};
@@ -99,11 +98,11 @@ void computeGyroStats(float32_t gyro[3], float32_t accel[3], float32_t mag[3], f
 	if (first_enter){
 		for (i = 0; i < 3; i++){
 			v_g[i] = 0.0f;
-			m_g[i] = gyro[i];
+			m_g[i] = imu_data->rate[i];
 			v_a[i] = 0.0f;
-			m_a[i] = accel[i];
+			m_a[i] = imu_data->acceleration[i];
 			v_m[i] = 0.0f;
-			m_m[i] = mag[i];
+			m_m[i] = imu_data->magnetic[i];
 		}
 
 		count++;
@@ -113,64 +112,63 @@ void computeGyroStats(float32_t gyro[3], float32_t accel[3], float32_t mag[3], f
 
 	float32_t m_k;
 	for (i = 0; i < 3; i++){
-		m_k = computeMean(m_g[i], gyro[i], (float32_t)count);
-		v_g[i] = computeVariance(v_g[i], gyro[i], m_g[i], m_k);
+		m_k = computeMean(m_g[i], imu_data->rate[i], (float32_t)count);
+		v_g[i] = computeVariance(v_g[i], imu_data->rate[i], m_g[i], m_k);
 		m_g[i] = m_k;
 
-		m_k = computeMean(m_a[i], accel[i], (float32_t)count);
-		v_a[i] = computeVariance(v_a[i], accel[i], m_a[i], m_k);
+		m_k = computeMean(m_a[i], imu_data->acceleration[i], (float32_t)count);
+		v_a[i] = computeVariance(v_a[i], imu_data->acceleration[i], m_a[i], m_k);
 		m_a[i] = m_k;
 
-		m_k = computeMean(m_m[i], mag[i], (float32_t)count);
-		v_m[i] = computeVariance(v_m[i], mag[i], m_m[i], m_k);
+		m_k = computeMean(m_m[i], imu_data->magnetic[i], (float32_t)count);
+		v_m[i] = computeVariance(v_m[i], imu_data->magnetic[i], m_m[i], m_k);
 		m_m[i] = m_k;
 
 		count++;
-		gyro_var[i] = v_g[i]/((float32_t)count - 1.0f);
-		accel_var[i] = v_a[i]/((float32_t)count - 1.0f);
-		mag_var[i] = v_m[i]/((float32_t)count - 1.0f);
+		imu_data->gyro_var[i] = v_g[i]/((float32_t)count - 1.0f);
+		imu_data->accel_var[i] = v_a[i]/((float32_t)count - 1.0f);
+		imu_data->mag_var[i] = v_m[i]/((float32_t)count - 1.0f);
 	}
 }
 
 int main(void) {
+	imu_data_s imu_data;
+	float32_t ypr[3] = {0};
+	char buffer[128];
+
 	float32_t average_imu[6] = {0};
 	float32_t w[3] = {0};
 	float32_t q[4] = {0};
+
 	// enable FPU full access
 	SCB->CPACR |= ((3UL << 10 * 2) | (3UL << 11 * 2)); /* set CP10 and CP11 Full Access */
 
 	SysTick_Config(SystemCoreClock/1000);
-	init_I2C1(); // initialize I2C peripheral
+	init_I2C1();
 	MPU6050_Initialize();
-	//init_gyro(I2C1);
-	//init_accel(I2C1);
 	init_mag(I2C1);
 	init_gpio();
 	init_USART2(115200);
 	init_cci(129);
-	//computeInitMeasurementFrame(average_imu);
-	//init_ekf(average_imu);
+	computeInitMeasurementFrame(&imu_data);
+	init_ekf(&imu_data);
 
-	imu_data_s imu_data;
-	float32_t ypr[3] = {0};
-	int8_t temperature;
-	char buffer[128];
 	while (1) {
 		if (flag10ms){
-			//read_gyro(I2C1, imu_data.rate, &temperature);
-			//read_accel(I2C1, imu_data.acceleration);
+			MPU6050_GetRawAccelGyro(&imu_data);
 			read_mag(I2C1, imu_data.magnetic);	// uT
 			imu_data.time = (float)SysTickCounter*1.0e-3f;
-			//run_ekf(0.1, imu_data.rate, imu_data.acceleration, imu_data.magnetic, &q[0], &w[0]);
+			run_ekf(20e-3, imu_data.rate, imu_data.acceleration, imu_data.magnetic, &q[0], &w[0]);
 			//triadComputation(&average_imu[0], &average_imu[3], imu_data.acceleration, imu_data.magnetic, ypr);
-			/*
 
-			 int len = sprintf(&buffer[0], "%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\r\n",
+			 int len = sprintf(&buffer[0], "%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\r\n",
 					imu_data.time,
 					imu_data.rate[0], imu_data.rate[1], imu_data.rate[2],
+					imu_data.acceleration[0], imu_data.acceleration[1], imu_data.acceleration[2],
 					imu_data.magnetic[0],imu_data.magnetic[1],imu_data.magnetic[2]);
-*/
-			int len = sprintf(&buffer[0], "%.3f,%.3f,%.3f\r\n",ypr[0],ypr[1],ypr[2]);
+
+			//int len = sprintf(&buffer[0], "%.3f,%.3f,%.3f\r\n",ypr[0],ypr[1],ypr[2]);
+
 			//USART_sendInt(&imu_data, sizeof(imu_data_s));
 			//USART_send(USART2, &imu_data, sizeof(imu_data_s));
 			USART_send(USART2, &buffer[0], len);

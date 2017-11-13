@@ -9,6 +9,8 @@ extern "C" {
 #include <stm32f4xx_i2c.h>
 #include <stdbool.h>
 
+#include "ekf.h"
+
 /* Includes */
 #define MPU6050_I2C                  I2C1
 
@@ -382,7 +384,7 @@ void MPU6050_SetClockSource(uint8_t source);
 // WHO_AM_I register
 uint8_t MPU6050_GetDeviceID();
 
-void MPU6050_GetRawAccelGyro(s16* AccelGyro);
+void MPU6050_GetRawAccelGyro(imu_data_s * data);
 
 void MPU6050_WriteBits(uint8_t slaveAddr, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t data);
 void MPU6050_WriteBit(uint8_t slaveAddr, uint8_t regAddr, uint8_t bitNum, uint8_t data);
