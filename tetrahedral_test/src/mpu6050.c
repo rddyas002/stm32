@@ -196,12 +196,13 @@ void MPU6050_GetRawAccelGyro(imu_data_s * data)
     data->rate[0] = (float32_t)AccelGyro[3] / MPU6050_SCALE_GYRO;
     data->rate[1] = (float32_t)AccelGyro[4] / MPU6050_SCALE_GYRO;
     data->rate[2] = (float32_t)AccelGyro[5] / MPU6050_SCALE_GYRO;
-
+/*
     float32_t norm_accel = sqrt(data->acceleration[0]*data->acceleration[0]+data->acceleration[1]*data->acceleration[1]+data->acceleration[2]*data->acceleration[2]);
     for (int i = 0; i < 3; i++){
     	data->acceleration[i] /= norm_accel;
     	data->rate[i] *= (M_PI_f/180.0f);
     }
+    */
 }
 
 /** Write multiple bits in an 8-bit device register.

@@ -136,7 +136,6 @@ int main(void) {
 	float32_t ypr[3] = {0};
 	char buffer[128];
 
-	float32_t average_imu[6] = {0};
 	float32_t w[3] = {0};
 	float32_t q[4] = {0};
 
@@ -158,8 +157,15 @@ int main(void) {
 			MPU6050_GetRawAccelGyro(&imu_data);
 			read_mag(I2C1, imu_data.magnetic);	// uT
 			imu_data.time = (float)SysTickCounter*1.0e-3f;
-			run_ekf(20e-3, imu_data.rate, imu_data.acceleration, imu_data.magnetic, &q[0], &w[0]);
+//			run_ekf(10e-3, imu_data.rate, imu_data.acceleration, imu_data.magnetic, &q[0], &w[0]);
 			//triadComputation(&average_imu[0], &average_imu[3], imu_data.acceleration, imu_data.magnetic, ypr);
+/*
+			 int len = sprintf(&buffer[0], "%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f\r\n",
+					imu_data.time,
+					imu_data.rate[0], imu_data.rate[1], imu_data.rate[2],
+					imu_data.acceleration[0], imu_data.acceleration[1], imu_data.acceleration[2],
+					imu_data.magnetic[0],imu_data.magnetic[1],imu_data.magnetic[2]);
+					*/
 
 			 int len = sprintf(&buffer[0], "%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\r\n",
 					imu_data.time,
@@ -167,7 +173,9 @@ int main(void) {
 					imu_data.acceleration[0], imu_data.acceleration[1], imu_data.acceleration[2],
 					imu_data.magnetic[0],imu_data.magnetic[1],imu_data.magnetic[2]);
 
-			//int len = sprintf(&buffer[0], "%.3f,%.3f,%.3f\r\n",ypr[0],ypr[1],ypr[2]);
+			//q2ypr(q, ypr);
+			//int len = sprintf(&buffer[0], "%5.2f,%5.2f,%5.2f\r\n",ypr[0],ypr[1],ypr[2]);
+			//int len = sprintf(&buffer[0], "%5.2f,%5.2f,%5.2f,%5.2f|%5.2f,%5.2f,%5.2f\r\n",q[0],q[1],q[2],q[3],w[0]*180.0f/M_PI_f,w[1]*180.0f/M_PI_f,w[2]*180.0f/M_PI_f);
 
 			//USART_sendInt(&imu_data, sizeof(imu_data_s));
 			//USART_send(USART2, &imu_data, sizeof(imu_data_s));

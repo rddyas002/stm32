@@ -48,18 +48,26 @@ void crossProduct3(float32_t a[3], float32_t b[3], float32_t c[3]);
 // initialise variables
 void init_ekf(imu_data_s * imu_data){
 	int i;
+	// initial covariance matrix
 	for (i = 0; i < 7; i++)
 		P_f32_a[i][i] = 0.1;
+
+	// initial state
 	for (i = 0; i < 7; i++)
 		x_f32_a[i] = x0_f32_a[i];
+
+	// process noise - gyro and bias
 	for (i = 0; i < 3; i++)
-		Q_f32_a[i][i] = imu_data->gyro_var[i];//1.3539e-6f;
+		Q_f32_a[i][i] = 1.3539e-6f;
 	for (i = 3; i < 6; i++)
 		Q_f32_a[i][i] = 3.3846e-17f;
+
+	// accel measurement noise
 	for (i = 0; i < 3; i++)
-		R_f32_a[i][i] = imu_data->accel_var[i];
+		R_f32_a[i][i] = 304.6174e-006f;
+	// magnetometer noise
 	for (i = 3; i < 6; i++)
-		R_f32_a[i][i] = imu_data->mag_var[i];
+		R_f32_a[i][i] = 3.3846e-3f;
 
 	for (i = 0; i < 3; i++){
 		ywf_f32[i] = imu_data->accel_offset[i];
@@ -69,7 +77,6 @@ void init_ekf(imu_data_s * imu_data){
 
 void run_ekf(float32_t Ts, float32_t gyro[3], float32_t accel[3], float32_t magnetic[3], float32_t * q, float32_t * w){
 	float32_t y[6];
-	float32_t gyro_rps[3];
 
 	float32_t accel_norm = sqrt(accel[0]*accel[0] + accel[1]*accel[1] + accel[2]*accel[2]);
 	float32_t mag_norm = sqrt(magnetic[0]*magnetic[0] + magnetic[1]*magnetic[1] + magnetic[2]*magnetic[2]);
@@ -79,14 +86,11 @@ void run_ekf(float32_t Ts, float32_t gyro[3], float32_t accel[3], float32_t magn
 	y[3] = magnetic[0]/mag_norm;
 	y[4] = magnetic[1]/mag_norm;
 	y[5] = magnetic[2]/mag_norm;
-	gyro_rps[0] = gyro[0]*M_PI_f/180.0f;
-	gyro_rps[1] = gyro[1]*M_PI_f/180.0f;
-	gyro_rps[2] = gyro[2]*M_PI_f/180.0f;
 
 	// propagate state
-	propagateState(x_f32_a, gyro_rps, Ts);
+	propagateState(x_f32_a, gyro, Ts);
 	// propagate covariance
-	propagateCovariance(P_f32_a, Ts, gyro_rps, Q_f32_a);
+	propagateCovariance(P_f32_a, Ts, gyro, Q_f32_a);
 	// update phase
 	updateStateAndCovariance(x_f32_a, P_f32_a, R_f32_a, y);
 

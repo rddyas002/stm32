@@ -129,9 +129,9 @@ float read_mag(I2C_TypeDef* I2Cx, float B_f[3]) {
 	B_f[2] = (float)B[2]*HMC5883L_GAIN + HMC5883L_OFFSET_Z;
 
 	float B_mag = sqrt(B_f[0]*B_f[0] + B_f[1]*B_f[1] + B_f[2]*B_f[2]);
-
+/*
 	for (int i = 0; i < 3; i++)
 		B_f[i] /= B_mag;
-
+*/
 	return B_mag;
 }
