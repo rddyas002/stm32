@@ -123,13 +123,12 @@ int main(int argc, char *argv[]){
 	imu_data_s imu_data;
 	int counter = 0;
 	while(keepRunning){
-		DWORD len = readSerialComms(hSerial, &received_bytes[0], 40);
 		PurgeComm(hSerial, PURGE_RXCLEAR|PURGE_TXCLEAR);
+		DWORD len = readSerialComms(hSerial, &received_bytes[0], 40);
 		memcpy(&imu_data, &received_bytes[0], 40);
-		printf("%7.1f|%7.1f%7.1f%7.1f|%7.1f%7.1f%7.1f|%7.1f%7.1f%7.1f\r\n",
+		printf("%7.3f:%6.1f %6.1f %6.1f|%6.1f %6.1f %6.1f\r\n",
 					imu_data.time,
 					imu_data.rate[0], imu_data.rate[1], imu_data.rate[2],
-					imu_data.acceleration[0], imu_data.acceleration[1], imu_data.acceleration[2],
 					imu_data.magnetic[0], imu_data.magnetic[1], imu_data.magnetic[2]);
 	}
 

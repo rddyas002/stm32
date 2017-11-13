@@ -21,5 +21,6 @@
 void init_ekf(float32_t ywf[6]);
 void run_ekf(float Ts, float gyro[3], float accel[3], float magnetic[3], float * q, float * w);
 void q2ypr(float32_t q[4], float32_t ypr[3]);
+void triadComputation(float32_t r1_wf[3], float32_t r2_wf[3], float32_t r1_bf[3], float32_t r2_bf[3], float32_t ypr[3]);
 
 #endif /* EKF_H_ */

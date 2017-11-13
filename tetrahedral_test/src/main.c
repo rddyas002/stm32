@@ -7,6 +7,7 @@
 #include "l3g4200d.h"
 #include "adxl345.h"
 #include "hmc5883l.h"
+#include "MPU6050.h"
 #include "usart.h"
 #include "gpio.h"
 #include "CciProtocol.h"
@@ -140,14 +141,15 @@ int main(void) {
 
 	SysTick_Config(SystemCoreClock/1000);
 	init_I2C1(); // initialize I2C peripheral
-	init_gyro(I2C1);
-	init_accel(I2C1);
+	MPU6050_Initialize();
+	//init_gyro(I2C1);
+	//init_accel(I2C1);
 	init_mag(I2C1);
 	init_gpio();
 	init_USART2(115200);
 	init_cci(129);
-	computeInitMeasurementFrame(average_imu);
-	init_ekf(average_imu);
+	//computeInitMeasurementFrame(average_imu);
+	//init_ekf(average_imu);
 
 	imu_data_s imu_data;
 	float32_t ypr[3] = {0};
@@ -155,18 +157,23 @@ int main(void) {
 	char buffer[128];
 	while (1) {
 		if (flag10ms){
-			read_gyro(I2C1, imu_data.rate, &temperature);
-			read_accel(I2C1, imu_data.acceleration);
+			//read_gyro(I2C1, imu_data.rate, &temperature);
+			//read_accel(I2C1, imu_data.acceleration);
 			read_mag(I2C1, imu_data.magnetic);	// uT
 			imu_data.time = (float)SysTickCounter*1.0e-3f;
 			//run_ekf(0.1, imu_data.rate, imu_data.acceleration, imu_data.magnetic, &q[0], &w[0]);
-			/*int len = sprintf(&buffer[0], "%8.3f:%8.2f,%8.2f,%8.2f|%8.2f,%8.2f,%8.2f\r\n",
+			//triadComputation(&average_imu[0], &average_imu[3], imu_data.acceleration, imu_data.magnetic, ypr);
+			/*
+
+			 int len = sprintf(&buffer[0], "%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\r\n",
 					imu_data.time,
 					imu_data.rate[0], imu_data.rate[1], imu_data.rate[2],
 					imu_data.magnetic[0],imu_data.magnetic[1],imu_data.magnetic[2]);
-					*/
+*/
+			int len = sprintf(&buffer[0], "%.3f,%.3f,%.3f\r\n",ypr[0],ypr[1],ypr[2]);
 			//USART_sendInt(&imu_data, sizeof(imu_data_s));
-			USART_send(USART2, &imu_data, sizeof(imu_data_s));
+			//USART_send(USART2, &imu_data, sizeof(imu_data_s));
+			USART_send(USART2, &buffer[0], len);
 			GPIO_ToggleBits(GPIOD, GPIO_Pin_12);
 			flag10ms = false;
 		}

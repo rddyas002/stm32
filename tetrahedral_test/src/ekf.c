@@ -43,6 +43,7 @@ void computeKalmanGain(float32_t K[7][6], const float32_t H[6][7], const float32
 void computeInnovation(float32_t x[7], float32_t y[6], float32_t ywf_f32[6], float32_t inno[6]);
 void updateState(float32_t x[7], float32_t K[7][6], float32_t innovation[6]);
 void updateCovariance(float32_t P[7][7], float32_t K[7][6], float32_t H[6][7]);
+void crossProduct3(float32_t a[3], float32_t b[3], float32_t c[3]);
 
 // initialise variables
 void init_ekf(float32_t ywf[6]){
@@ -509,4 +510,54 @@ void v32f_normalise4(float32_t v[4]){
 	v[1] /= norm;
 	v[2] /= norm;
 	v[3] /= norm;
+}
+
+void triadComputation(float32_t r1_wf[3], float32_t r2_wf[3], float32_t r1_bf[3], float32_t r2_bf[3], float32_t ypr[3]){
+	// find orthogonal vectors in both frame
+	float32_t r3_wf[3];
+	float32_t r13_wf[3];
+	float32_t r3_bf[3];
+	float32_t r13_bf[3];
+	float32_t Rw2b[3][3];
+	crossProduct3(r1_wf, r2_wf, r3_wf);
+	crossProduct3(r1_wf, r3_wf, r13_wf);	// orthogonal set r1 r13 r3
+	crossProduct3(r1_bf, r2_bf, r3_bf);
+	crossProduct3(r1_bf, r3_bf, r13_bf);
+	// compute rotation matrix
+
+	float32_t bf[3][3];
+	float32_t wf[3][3];
+	float32_t wft[3][3];
+
+	int i;
+	for (i = 0; i < 3; i++){
+		bf[i][0] = r1_bf[i];
+		bf[i][1] = r13_bf[i];
+		bf[i][2] = r3_bf[i];
+		wf[i][0] = r1_wf[i];
+		wf[i][1] = r13_wf[i];
+		wf[i][2] = r3_wf[i];
+	}
+
+	arm_matrix_instance_f32 bf_m;
+	arm_matrix_instance_f32 wf_m;
+	arm_matrix_instance_f32 wft_m;
+	arm_matrix_instance_f32 R_m;
+	arm_mat_init_f32(&wf_m, 3, 3, &wf[0][0]);
+	arm_mat_init_f32(&wft_m, 3, 3, &wft[0][0]);
+	arm_mat_init_f32(&bf_m, 3, 3, &bf[0][0]);
+	arm_mat_init_f32(&R_m, 3, 3, &Rw2b[0][0]);
+
+	arm_mat_trans_f32(&wf_m, &wft_m);
+	arm_mat_mult_f32(&bf_m, &wft_m, &R_m);
+
+	ypr[0] = atan2(Rw2b[1][2], Rw2b[2][2]);
+	ypr[1] = -asin(Rw2b[0][2]);
+	ypr[2] = atan2(Rw2b[0][1], Rw2b[0][0]);
+}
+
+void crossProduct3(float32_t a[3], float32_t b[3], float32_t c[3]) {
+	c[0] = a[1] * b[2] - a[2] * b[1];
+	c[1] = a[2] * b[0] - a[0] * b[2];
+	c[2] = a[0] * b[1] - a[1] * b[0];
 }
