@@ -18,8 +18,16 @@ void computeGyroStats(float32_t gyro[3], float32_t accel[3], float32_t mag[3], f
 
 __IO uint32_t SysTickCounter = 0;
 __IO int32_t DelayCounter = 0;
-void SysTick_Handler(void){
+__IO bool flag10ms = false;
+__IO bool flag100ms = false;
+void timingHandler(void){
 	SysTickCounter++;
+
+	if(!(SysTickCounter % 20))
+		flag10ms = true;
+	if(!(SysTickCounter % 100))
+		flag100ms = true;
+
 	DelayCounter--;
 }
 
@@ -143,24 +151,35 @@ int main(void) {
 
 	imu_data_s imu_data;
 	float32_t ypr[3] = {0};
+	int8_t temperature;
 	char buffer[128];
 	while (1) {
-		int8_t temperature;
-		read_gyro(I2C1, imu_data.rate, &temperature);
-		read_accel(I2C1, imu_data.acceleration);
-		read_mag(I2C1, imu_data.magnetic);	// uT
-		imu_data.time = (float)SysTickCounter*1.0e-3f;
-		run_ekf(0.1, imu_data.rate, imu_data.acceleration, imu_data.magnetic, &q[0], &w[0]);
-		imu_data.time = (float)SysTickCounter*1.0e-3f;
-		ypr[0] = atan2(2.0f*q[2]*q[3] + 2.0f*q[0]*q[1], q[3]*q[3] - q[2]*q[2] - q[1]*q[1] + q[0]*q[0])*180.0f/M_PI_f;
-		ypr[1] = -asin(2.0f*q[1]*q[3] - 2.0f*q[0]*q[2])*180.0f/M_PI_f;
-		ypr[2] = atan2(2.0f*q[1]*q[2] + 2.0f*q[0]*q[3], q[1]*q[1] + q[0]*q[0] - q[3]*q[3] - q[2]*q[2])*180.0f/M_PI_f;
-		//q2ypr(q, ypr);
-		//sprintf(&buffer[0], "%5.2f,%5.2f,%5.2f,%5.2f|%5.2f,%5.2f,%5.2f\r\n", q[0], q[1], q[2], q[3], w[0]*180/M_PI, w[1]*180/M_PI, w[2]*180/M_PI);
-		sprintf(&buffer[0], "%5.2f,%5.2f,%5.2f|%5.2f,%5.2f,%5.2f\r\n", ypr[0], ypr[1], ypr[2], w[0]*180/M_PI, w[1]*180/M_PI, w[2]*180/M_PI);
-		USART_puts(USART2, &buffer[0]);
-		//USART_send(USART2, (uint8_t *) &imu_data, sizeof(imu_data_s));
-		GPIO_ToggleBits(GPIOD, GPIO_Pin_12);
-		msDelaySysTick(100);
+		if (flag10ms){
+			read_gyro(I2C1, imu_data.rate, &temperature);
+			read_accel(I2C1, imu_data.acceleration);
+			read_mag(I2C1, imu_data.magnetic);	// uT
+			imu_data.time = (float)SysTickCounter*1.0e-3f;
+			//run_ekf(0.1, imu_data.rate, imu_data.acceleration, imu_data.magnetic, &q[0], &w[0]);
+			/*int len = sprintf(&buffer[0], "%8.3f:%8.2f,%8.2f,%8.2f|%8.2f,%8.2f,%8.2f\r\n",
+					imu_data.time,
+					imu_data.rate[0], imu_data.rate[1], imu_data.rate[2],
+					imu_data.magnetic[0],imu_data.magnetic[1],imu_data.magnetic[2]);
+					*/
+			//USART_sendInt(&imu_data, sizeof(imu_data_s));
+			USART_send(USART2, &imu_data, sizeof(imu_data_s));
+			GPIO_ToggleBits(GPIOD, GPIO_Pin_12);
+			flag10ms = false;
+		}
+/*
+		if (flag100ms){
+			int len = sprintf(&buffer[0], "%8.3f:%8.2f,%8.2f,%8.2f|%8.2f,%8.2f,%8.2f\r\n",
+					imu_data.time,
+					imu_data.rate[0], imu_data.rate[1], imu_data.rate[2],
+					imu_data.magnetic[0],imu_data.magnetic[1],imu_data.magnetic[2]);
+			USART_sendInt(&buffer[0], len);
+			GPIO_ToggleBits(GPIOD, GPIO_Pin_12);
+			flag100ms = false;
+		}
+*/
 	}
 }

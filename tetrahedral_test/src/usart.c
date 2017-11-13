@@ -4,11 +4,18 @@
 #include "usart.h"
 #include "CciProtocol.h"
 
+typedef struct{
+	uint8_t send_buffer[128];
+	uint8_t length;
+	uint8_t index;
+}USART_tx;
+
 #define MAX_STRLEN 12
 #define MAX_CCI_LEN 16
 volatile char received_string[MAX_STRLEN+1]; 	 // this will hold the recieved string
 volatile char cci_rx[MAX_CCI_LEN]; 	 // this will hold the recieved string
 CCI_MessageFull * cciRxMsg;
+USART_tx USART_tx_buffer;
 
 void init_USART1(uint32_t baudrate){
 	GPIO_InitTypeDef GPIO_InitStruct; 		// this is for the GPIO pins used as TX and RX
@@ -96,6 +103,27 @@ void init_USART2(uint32_t baudrate){
 	cciRxMsg = (CCI_MessageFull * ) malloc(sizeof(CCI_MessageFull));
 }
 
+void USART_sendInt(uint8_t * data, uint8_t length){
+	// copy data to send buffer
+	memcpy(&USART_tx_buffer.send_buffer[0], data, length);
+	USART_tx_buffer.length = length;
+	USART_tx_buffer.index = 0;
+
+	// let interrupt handle transmit
+	USART_ITConfig(USART2, USART_IT_TXE, ENABLE);
+}
+
+void USART_transmitInterruptHandler(){
+	// while there is data to transmit
+	if(USART_tx_buffer.index < USART_tx_buffer.length){
+		USART_SendData(USART2, USART_tx_buffer.send_buffer[USART_tx_buffer.index++]);
+	}
+	else{
+		// transmission complete, disable interrupt
+		USART_ITConfig(USART2, USART_IT_TXE, DISABLE);
+	}
+}
+
 void USART_puts(USART_TypeDef* USARTx, volatile char *s){
 
 	while(*s){
@@ -160,5 +188,9 @@ void USART2_IRQHandler(void){
 			//GPIO_ToggleBits(GPIOD, GPIO_Pin_12);
 			cnt = 0;
 		}
+	}
+
+	if (USART_GetITStatus(USART2, USART_IT_TXE)){
+		USART_transmitInterruptHandler();
 	}
 }
