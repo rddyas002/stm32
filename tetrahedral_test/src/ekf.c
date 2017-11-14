@@ -24,11 +24,11 @@ const float32_t x0_f32_a[7] =
 	0.0
 };
 
-float32_t Q_f32_a[6][6];		// Process noise covariance
-float32_t R_f32_a[6][6];		// Measurement noise covariance
-float32_t x_f32_a[7];			// State vector
-float32_t P_f32_a[7][7];		// Error covariance
-float32_t ywf_f32[6];			// World frame origin measurement reference
+float32_t Q_f32_a[6][6] = {0};		// Process noise covariance
+float32_t R_f32_a[6][6] = {0};		// Measurement noise covariance
+float32_t x_f32_a[7] = {0};			// State vector
+float32_t P_f32_a[7][7] = {0};		// Error covariance
+float32_t ywf_f32[6] = {0};			// World frame origin measurement reference
 
 void v32f_sub(float32_t y[3], const float32_t a[3], const float32_t b[3]);
 void v32f_normalise4(float32_t v[4]);
@@ -58,34 +58,39 @@ void init_ekf(imu_data_s * imu_data){
 
 	// process noise - gyro and bias
 	for (i = 0; i < 3; i++)
-		Q_f32_a[i][i] = 1.3539e-6f;
+		Q_f32_a[i][i] = 0.35e-5f;
 	for (i = 3; i < 6; i++)
-		Q_f32_a[i][i] = 3.3846e-17f;
+		Q_f32_a[i][i] = 2.5e-8f;
 
 	// accel measurement noise
 	for (i = 0; i < 3; i++)
-		R_f32_a[i][i] = 304.6174e-006f;
+		R_f32_a[i][i] = 0.3e-4f;
 	// magnetometer noise
 	for (i = 3; i < 6; i++)
-		R_f32_a[i][i] = 3.3846e-3f;
+		R_f32_a[i][i] = 0.4e-4f;
 
 	for (i = 0; i < 3; i++){
 		ywf_f32[i] = imu_data->accel_offset[i];
 		ywf_f32[i+3] = imu_data->mag_offset[i];
 	}
+
+	ywf_f32[0] = 0.0039f;
+	ywf_f32[1] = 0.0173f;
+	ywf_f32[2] = -1.0000f;
+	ywf_f32[3] = 0.1224f;
+	ywf_f32[4] = -0.6577f;
+	ywf_f32[5] = 0.7433f;
 }
 
 void run_ekf(float32_t Ts, float32_t gyro[3], float32_t accel[3], float32_t magnetic[3], float32_t * q, float32_t * w){
 	float32_t y[6];
 
-	float32_t accel_norm = sqrt(accel[0]*accel[0] + accel[1]*accel[1] + accel[2]*accel[2]);
-	float32_t mag_norm = sqrt(magnetic[0]*magnetic[0] + magnetic[1]*magnetic[1] + magnetic[2]*magnetic[2]);
-	y[0] = accel[0]/accel_norm;
-	y[1] = accel[1]/accel_norm;
-	y[2] = accel[2]/accel_norm;
-	y[3] = magnetic[0]/mag_norm;
-	y[4] = magnetic[1]/mag_norm;
-	y[5] = magnetic[2]/mag_norm;
+	y[0] = accel[0];
+	y[1] = accel[1];
+	y[2] = accel[2];
+	y[3] = magnetic[0];
+	y[4] = magnetic[1];
+	y[5] = magnetic[2];
 
 	// propagate state
 	propagateState(x_f32_a, gyro, Ts);
@@ -250,76 +255,55 @@ void computeW(float32_t W[7][6], const float32_t Ts, const float32_t x[7]){
 }
 
 void propagateCovariance(float32_t P[7][7], const float32_t Ts, const float32_t gyro[3], const float32_t Q[6][6]){
-	int i,j,k;
 	float32_t F[7][7];
+	float32_t Ft[7][7];
 	float32_t W[7][6];
+	float32_t Wt[6][7];
 	float32_t FP[7][7] = {{0},{0}};
 	float32_t FPFt[7][7] = {{0},{0}};
 	float32_t WQ[7][6] = {{0},{0}};
 	float32_t WQWt[7][7] = {{0},{0}};
-	float32_t sum_fp, sum_wq;
 
-	computeF(F, Ts, x_f32_a, gyro);
-	computeW(W, Ts, x_f32_a);
+	arm_matrix_instance_f32 F_f32_m;
+	arm_matrix_instance_f32 P_f32_m;
+	arm_matrix_instance_f32 Ft_f32_m;
+	arm_matrix_instance_f32 FP_f32_m;
+	arm_matrix_instance_f32 FPFt_f32_m;
+	arm_matrix_instance_f32 W_f32_m;
+	arm_matrix_instance_f32 Q_f32_m;
+	arm_matrix_instance_f32 Wt_f32_m;
+	arm_matrix_instance_f32 WQ_f32_m;
+	arm_matrix_instance_f32 WQWt_f32_m;
 
-	// P = F*P*F' + W*Q*W'
-	//arm_mat_mult_f32(&F_f32_m, &P_f32_m, &FP_f32_m);
+	arm_mat_init_f32(&F_f32_m, 7, 7, &F[0][0]);
+	arm_mat_init_f32(&Ft_f32_m, 7, 7, &Ft[0][0]);
+	arm_mat_init_f32(&FP_f32_m, 7, 7, &FP[0][0]);
+	arm_mat_init_f32(&FPFt_f32_m, 7, 7, &FPFt[0][0]);
+	arm_mat_init_f32(&P_f32_m, 7, 7, &P[0][0]);
+	arm_mat_init_f32(&W_f32_m, 7, 6, &W[0][0]);
+	arm_mat_init_f32(&Q_f32_m, 6, 6, &Q[0][0]);
+	arm_mat_init_f32(&Wt_f32_m, 6, 7, &Wt[0][0]);
+	arm_mat_init_f32(&WQ_f32_m, 7, 6, &WQ[0][0]);
+	arm_mat_init_f32(&WQWt_f32_m, 7, 7, &WQWt[0][0]);
 
-	// FP = F*P
-	// WQ = W*Q
-	for (i = 0; i < 7; i++){
-		for (j = 0; j < 7; j++){
-			sum_fp = 0.0f;
-			for (k = 0; k < 7; k++){
-				sum_fp += F[i][k]*P[k][j];
-			}
-			FP[i][j] = sum_fp;
-		}
-	}
+	computeF(F, Ts, x_f32_a, gyro);	// checked
+	computeW(W, Ts, x_f32_a);		// checked
 
-	for (i = 0; i < 7; i++){
-		for (j = 0; j < 6; j++){
-			sum_wq = 0.0f;
-			for (k = 0; k < 6; k++){
-				sum_wq += W[i][k]*Q[k][j];
-			}
-			WQ[i][j] = sum_wq;
-		}
-	}
-	// P = FP*F' + WQ*W'
+	arm_mat_trans_f32(&F_f32_m, &Ft_f32_m);
+	arm_mat_mult_f32(&F_f32_m, &P_f32_m, &FP_f32_m);
+	arm_mat_mult_f32(&FP_f32_m, &Ft_f32_m, &FPFt_f32_m);
 
-	//FPF'
-	for (i = 0; i < 7; i++){
-		for (j = 0; j < 7; j++){
-			sum_fp = 0.0f;
-			for (k = 0; k < 7; k++){
-				sum_fp += FP[i][k]*F[j][k];
-			}
-			FPFt[i][j] = sum_fp;
-		}
-	}
+	arm_mat_trans_f32(&W_f32_m, &Wt_f32_m);
+	arm_mat_mult_f32(&W_f32_m, &Q_f32_m, &WQ_f32_m);
+	arm_mat_mult_f32(&WQ_f32_m, &Wt_f32_m, &WQWt_f32_m);
 
-	//WQW'
-	for (i = 0; i < 7; i++){
-		for (j = 0; j < 7; j++){
-			sum_wq = 0.0f;
-			for (k = 0; k < 6; k++){
-				sum_wq += WQ[i][k]*W[j][k];
-			}
-			WQWt[i][j] = sum_wq;
-		}
-	}
-
-	// P = FPFt + WQWt
-	for (i = 0; i < 7; i++)
-		for (j = 0; j < 7; j++)
-			P[i][j] = FPFt[i][j] + WQWt[i][j];
+	arm_mat_add_f32(&FPFt_f32_m, &WQWt_f32_m, &P_f32_m);
 }
 
 void updateStateAndCovariance(float32_t x[7], float32_t P[7][7], const float32_t R[6][6], const float32_t y[6]){
 	float32_t H[6][7] = {{0},{0}};
 	float32_t K[7][6] = {{0},{0}};
-	float32_t innovation[6];
+	float32_t innovation[6] = {0};
 
 	// compute H
 	computeH(H, x, ywf_f32);
@@ -419,7 +403,7 @@ void computeKalmanGain(float32_t K[7][6], const float32_t H[6][7], const float32
 	arm_mat_mult_f32(&H_f32_m, &PHt_f32_m, &HPHt_f32_m);
 	// K = PHt/(HPHt + R)
 	arm_mat_add_f32(&HPHt_f32_m, &R_f32_m, &HPHt_f32_m);
-	// K = PHt/(HPHt)
+	// K = PHt\(HPHt)
 	arm_mat_inverse_f32(&HPHt_f32_m, &K_den_f32_m);
 	// K = PHt*K_den
 	arm_mat_mult_f32(&PHt_f32_m, &K_den_f32_m, &K_f32_m);
@@ -459,8 +443,9 @@ void updateState(float32_t x[7], float32_t K[7][6], float32_t innovation[6]){
 }
 
 void updateCovariance(float32_t P[7][7], float32_t K[7][6], float32_t H[6][7]){
-	float32_t KH[7][7];
-	float32_t P2[7][7];
+	float32_t KH[7][7] = {{0},{0}};
+	float32_t KHP[7][7] = {{0},{0}};
+	float32_t P2[7][7] = {{0},{0}};
 	float32_t eye7[7][7] = {{0},{0}};
 
 	int i;
@@ -472,6 +457,7 @@ void updateCovariance(float32_t P[7][7], float32_t K[7][6], float32_t H[6][7]){
 	arm_matrix_instance_f32 H_f32_m;
 	arm_matrix_instance_f32 K_f32_m;
 	arm_matrix_instance_f32 KH_f32_m;
+	arm_matrix_instance_f32 KHP_f32_m;
 	arm_matrix_instance_f32 eye7_f32_m;
 
 	arm_mat_init_f32(&P_f32_m, 7, 7, &P[0][0]);
@@ -479,11 +465,12 @@ void updateCovariance(float32_t P[7][7], float32_t K[7][6], float32_t H[6][7]){
 	arm_mat_init_f32(&K_f32_m, 7, 6, &K[0][0]);
 	arm_mat_init_f32(&H_f32_m, 6, 7, &H[0][0]);
 	arm_mat_init_f32(&KH_f32_m, 7, 7, &KH[0][0]);
+	arm_mat_init_f32(&KHP_f32_m, 7, 7, &KHP[0][0]);
 	arm_mat_init_f32(&eye7_f32_m, 7, 7, &eye7[0][0]);
 
 	arm_mat_mult_f32(&K_f32_m, &H_f32_m, &KH_f32_m);
-	arm_mat_sub_f32(&eye7_f32_m, &KH_f32_m, &KH_f32_m);
-	arm_mat_mult_f32(&KH_f32_m, &P_f32_m, &P2_f32_m);
+	arm_mat_mult_f32(&KH_f32_m, &P_f32_m, &KHP_f32_m);
+	arm_mat_sub_f32(&P_f32_m, &KHP_f32_m, &P2_f32_m);
 
 	memcpy(&P[0][0], &P2[0][0], sizeof(float32_t)*7*7);
 }

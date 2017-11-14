@@ -151,14 +151,34 @@ int main(void) {
 	init_cci(129);
 	computeInitMeasurementFrame(&imu_data);
 	init_ekf(&imu_data);
-
+	float32_t prev_time = 0;
+	float32_t delta_t = 0;
 	while (1) {
 		if (flag10ms){
 			MPU6050_GetRawAccelGyro(&imu_data);
 			read_mag(I2C1, imu_data.magnetic);	// uT
 			imu_data.time = (float)SysTickCounter*1.0e-3f;
-//			run_ekf(10e-3, imu_data.rate, imu_data.acceleration, imu_data.magnetic, &q[0], &w[0]);
-			//triadComputation(&average_imu[0], &average_imu[3], imu_data.acceleration, imu_data.magnetic, ypr);
+			if (prev_time == 0){
+				delta_t = 20e-3f;
+				prev_time = imu_data.time;
+			}
+			else{
+				delta_t = imu_data.time - prev_time;
+				prev_time = imu_data.time;
+			}
+			delta_t = 20e-3f;
+			imu_data.rate[0] = -0.0320f;
+			imu_data.rate[1] = 0.0220f;
+			imu_data.rate[2] = -0.0110f;
+			imu_data.acceleration[0] = 0.001f;
+			imu_data.acceleration[1] = 0.015f;
+			imu_data.acceleration[2] = -1.00f;
+			imu_data.magnetic[0] = 0.124f;
+			imu_data.magnetic[1] = -0.658f;
+			imu_data.magnetic[2] = 0.7430f;
+
+			run_ekf(delta_t, imu_data.rate, imu_data.acceleration, imu_data.magnetic, &q[0], &w[0]);
+//			triadComputation(imu_data.accel_offset, imu_data.mag_offset, imu_data.acceleration, imu_data.magnetic, ypr);
 /*
 			 int len = sprintf(&buffer[0], "%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f\r\n",
 					imu_data.time,
@@ -166,16 +186,20 @@ int main(void) {
 					imu_data.acceleration[0], imu_data.acceleration[1], imu_data.acceleration[2],
 					imu_data.magnetic[0],imu_data.magnetic[1],imu_data.magnetic[2]);
 					*/
-
+/*
 			 int len = sprintf(&buffer[0], "%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\r\n",
 					imu_data.time,
 					imu_data.rate[0], imu_data.rate[1], imu_data.rate[2],
 					imu_data.acceleration[0], imu_data.acceleration[1], imu_data.acceleration[2],
 					imu_data.magnetic[0],imu_data.magnetic[1],imu_data.magnetic[2]);
-
+*/
 			//q2ypr(q, ypr);
 			//int len = sprintf(&buffer[0], "%5.2f,%5.2f,%5.2f\r\n",ypr[0],ypr[1],ypr[2]);
-			//int len = sprintf(&buffer[0], "%5.2f,%5.2f,%5.2f,%5.2f|%5.2f,%5.2f,%5.2f\r\n",q[0],q[1],q[2],q[3],w[0]*180.0f/M_PI_f,w[1]*180.0f/M_PI_f,w[2]*180.0f/M_PI_f);
+
+			int len = sprintf(&buffer[0], "%5.2f,%5.2f,%5.2f,%5.2f|%5.2f,%5.2f,%5.2f|%5.2f,%5.2f,%5.2f|\r\n",
+					q[0],q[1],q[2],q[3],
+					w[0]*180.0f/M_PI_f,w[1]*180.0f/M_PI_f,w[2]*180.0f/M_PI_f,
+					imu_data.rate[0]*180.0f/M_PI_f,imu_data.rate[1]*180.0f/M_PI_f,imu_data.rate[2]*180.0f/M_PI_f);
 
 			//USART_sendInt(&imu_data, sizeof(imu_data_s));
 			//USART_send(USART2, &imu_data, sizeof(imu_data_s));
