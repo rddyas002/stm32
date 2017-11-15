@@ -70,6 +70,7 @@ void updateCovariance(float32_t P[7][7], float32_t K[7][6], float32_t H[6][7]);
 void crossProduct3(float32_t a[3], float32_t b[3], float32_t c[3]);
 
 // https://github.com/simondlevy/TinyEKF/blob/master/tiny_ekf.c
+// http://diydrones.com/profiles/blogs/tinyekf-lightweight-c-c-extended-kalman-filter-for
 
 // initialise variables
 void init_ekf(imu_data_s * imu_data){
