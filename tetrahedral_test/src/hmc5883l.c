@@ -7,7 +7,7 @@ uint8_t HMC5883L_ReadByte(I2C_TypeDef* I2Cx, u8 slaveAddr, uint8_t address);
 #define HMC5883L_GAIN 		0.92f
 #define HMC5883L_OFFSET_X 	(33.0f)
 #define HMC5883L_OFFSET_Y 	(-40.0f)
-#define HMC5883L_OFFSET_Z 	(145.0f)
+#define HMC5883L_OFFSET_Z 	(95.0f)
 
 void init_mag(I2C_TypeDef* I2Cx) {
 	// write CONFIG_A register
@@ -129,11 +129,10 @@ float read_mag(I2C_TypeDef* I2Cx, float B_f[3]) {
 	B_f[2] = (float)B[2]*HMC5883L_GAIN + HMC5883L_OFFSET_Z;
 
 	float B_mag = sqrt(B_f[0]*B_f[0] + B_f[1]*B_f[1] + B_f[2]*B_f[2]);
-/*
+
 	for (int i = 0; i < 3; i++){
 		B_f[i] /= B_mag;
-		B_f[i] *= 10.0f;
 	}
-*/
+
 	return B_mag;
 }

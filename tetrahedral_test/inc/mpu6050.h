@@ -8,6 +8,7 @@ extern "C" {
 #include <stm32f4xx.h>
 #include <stm32f4xx_i2c.h>
 #include <stdbool.h>
+#include <arm_math.h>
 
 #include "ekf.h"
 

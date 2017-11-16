@@ -199,7 +199,7 @@ void MPU6050_GetRawAccelGyro(imu_data_s * data)
 
     float32_t norm_accel = sqrt(data->acceleration[0]*data->acceleration[0]+data->acceleration[1]*data->acceleration[1]+data->acceleration[2]*data->acceleration[2]);
     for (int i = 0; i < 3; i++){
-    	//data->acceleration[i] /= norm_accel;
+    	data->acceleration[i] /= norm_accel;
     	//data->acceleration[i] *= 10.0f;
     	data->rate[i] *= (M_PI_f/180.0f);
     }

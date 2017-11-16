@@ -13,27 +13,26 @@
 #include <string.h>
 #include <stdbool.h>
 
-#include "stm32f4xx.h"
-#include "arm_math.h"
+#include "matrix_math.h"
 
 typedef struct{
-	float32_t rate[3];			// dps
-	float32_t acceleration[3];	// g
-	float32_t magnetic[3];		// uT
-	float32_t gyro_var[3];
-	float32_t accel_var[3];
-	float32_t mag_var[3];
-	float32_t gyro_offset[3];
-	float32_t accel_offset[3];
-	float32_t mag_offset[3];
-	float32_t time;
+	float rate[3];			// dps
+	float acceleration[3];	// g
+	float magnetic[3];		// uT
+	float gyro_var[3];
+	float accel_var[3];
+	float mag_var[3];
+	float gyro_offset[3];
+	float accel_offset[3];
+	float mag_offset[3];
+	float time;
 }__attribute__((packed)) imu_data_s;
 
-#define M_PI_f		3.14159265358979323846f
+#define M_PI_f		3.14159265358979323846
 
 void init_ekf(imu_data_s * imu_data);
-void run_ekf(float32_t Ts, float32_t gyro[3], float32_t accel[3], float32_t magnetic[3], float32_t * q, float32_t * w);
-void q2ypr(float32_t q[4], float32_t ypr[3]);
-void triadComputation(float32_t r1_wf[3], float32_t r2_wf[3], float32_t r1_bf[3], float32_t r2_bf[3], float32_t ypr[3]);
+void run_ekf(double Ts, float gyro[3], float accel[3], float magnetic[3], double * q, double * w);
+void q2ypr(double q[4], double ypr[3]);
+void triadComputation(float r1_wf[3], float r2_wf[3], float r1_bf[3], float r2_bf[3], float ypr[3]);
 
 #endif /* EKF_H_ */
