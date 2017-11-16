@@ -9,12 +9,7 @@
 #include <windows.h>
 #include <stdint.h>
 
-typedef struct{
-	float rate[3];			// dps
-	float acceleration[3];	// g
-	float magnetic[3];		// uT
-	float time;
-}__attribute__((packed)) imu_data_s;
+#include "ekf.h"
 
 static volatile int keepRunning = 1;
 void intHandler(int dummy) {

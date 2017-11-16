@@ -23,4 +23,26 @@
 		<nature>org.eclipse.cdt.managedbuilder.core.managedBuildNature</nature>
 		<nature>org.eclipse.cdt.managedbuilder.core.ScannerConfigNature</nature>
 	</natures>
+	<linkedResources>
+		<link>
+			<name>inc/ekf.h</name>
+			<type>1</type>
+			<locationURI>PARENT-1-PROJECT_LOC/tetrahedral_test/inc/ekf.h</locationURI>
+		</link>
+		<link>
+			<name>inc/matrix_math.h</name>
+			<type>1</type>
+			<locationURI>PARENT-1-PROJECT_LOC/tetrahedral_test/inc/matrix_math.h</locationURI>
+		</link>
+		<link>
+			<name>src/ekf.c</name>
+			<type>1</type>
+			<locationURI>PARENT-1-PROJECT_LOC/tetrahedral_test/src/ekf.c</locationURI>
+		</link>
+		<link>
+			<name>src/matrix_math.c</name>
+			<type>1</type>
+			<locationURI>PARENT-1-PROJECT_LOC/tetrahedral_test/src/matrix_math.c</locationURI>
+		</link>
+	</linkedResources>
 </projectDescription>

@@ -1,5 +1,5 @@
 #include "ekf.h"
-#define ARM
+//#define ARM
 // State error covariance matrix
 const double P0_f32_a[7][7] =
 {
