@@ -87,9 +87,7 @@ DWORD readSerialComms(HANDLE hSerial, uint8_t * data, uint16_t length){
 
 int main(int argc, char *argv[]){
 	signal(SIGINT, intHandler);
-
-	char bytes_to_send[11] = {'0','1','2','3','4','5','6','7','8','9','\0'};
-
+	/*
 	// Declare variables and structures
 	HANDLE hSerial;
 
@@ -117,17 +115,103 @@ int main(int argc, char *argv[]){
 	uint8_t received_bytes[64];
 	imu_data_s imu_data;
 	int counter = 0;
+	*/
+	imu_data_s imu_data;
+
+	FILE *ifp;
+	ifp = fopen("C:\\Users\\RDDYA\\Documents\\stm32\\serial_comms\\Debug\\imu.csv", "r");
+
+	if (ifp == NULL) {
+	  fprintf(stderr, "Can't open input file in.list!\n");
+	  exit(1);
+	}
+
+	double delta_t = 0;
+	double prev_t = 0;
+
+	int i;
+	double measurements[9] = {0};
+
+	for (i = 0; i < 50; i++){
+		if(fscanf(ifp, "%f,%f,%f,%f,%f,%f,%f,%f,%f,%f\r\n", &imu_data.time,
+				&imu_data.rate[0],&imu_data.rate[1],&imu_data.rate[2],
+				&imu_data.acceleration[0],&imu_data.acceleration[1],&imu_data.acceleration[2],
+				&imu_data.magnetic[0],&imu_data.magnetic[1],&imu_data.magnetic[2]) == EOF){
+			exit(1);
+		}
+
+		// store data
+		measurements[0] += (double)imu_data.acceleration[0];
+		measurements[1] += (double)imu_data.acceleration[1];
+		measurements[2] += (double)imu_data.acceleration[2];
+		measurements[3] += (double)imu_data.rate[0];
+		measurements[4] += (double)imu_data.rate[1];
+		measurements[5] += (double)imu_data.rate[2];
+		measurements[6] += (double)imu_data.magnetic[0];
+		measurements[7] += (double)imu_data.magnetic[1];
+		measurements[8] += (double)imu_data.magnetic[2];
+	}
+
+	for (i = 0; i < 9; i++)
+		measurements[i] /= 50.0;
+
+	imu_data.accel_offset[0] = (float)measurements[0];
+	imu_data.accel_offset[1] = (float)measurements[1];
+	imu_data.accel_offset[2] = (float)measurements[2];
+
+	imu_data.gyro_offset[0] = (float)measurements[3];
+	imu_data.gyro_offset[1] = (float)measurements[4];
+	imu_data.gyro_offset[2] = (float)measurements[5];
+
+	imu_data.mag_offset[0] = (float)measurements[6];
+	imu_data.mag_offset[1] = (float)measurements[7];
+	imu_data.mag_offset[2] = (float)measurements[8];
+
+	init_ekf(&imu_data);
+
 	while(keepRunning){
-		PurgeComm(hSerial, PURGE_RXCLEAR|PURGE_TXCLEAR);
+/*		PurgeComm(hSerial, PURGE_RXCLEAR|PURGE_TXCLEAR);
 		DWORD len = readSerialComms(hSerial, &received_bytes[0], 40);
 		memcpy(&imu_data, &received_bytes[0], 40);
 		printf("%7.3f:%6.1f %6.1f %6.1f|%6.1f %6.1f %6.1f\r\n",
 					imu_data.time,
 					imu_data.rate[0], imu_data.rate[1], imu_data.rate[2],
 					imu_data.magnetic[0], imu_data.magnetic[1], imu_data.magnetic[2]);
+					*/
+		if(fscanf(ifp, "%f,%f,%f,%f,%f,%f,%f,%f,%f,%f\r\n", &imu_data.time,
+				&imu_data.rate[0],&imu_data.rate[1],&imu_data.rate[2],
+				&imu_data.acceleration[0],&imu_data.acceleration[1],&imu_data.acceleration[2],
+				&imu_data.magnetic[0],&imu_data.magnetic[1],&imu_data.magnetic[2]) == EOF){
+			break;
+		}
+
+		double q[4],b[3];
+//		imu_data.rate[0] = -0.032;
+//		imu_data.rate[1] = 0.022;
+//		imu_data.rate[2] = -0.011;
+//		imu_data.acceleration[0] = 0.001;
+//		imu_data.acceleration[1] = 0.015;
+//		imu_data.acceleration[2] = -1.0;
+//		imu_data.magnetic[0] = 0.124;
+//		imu_data.magnetic[1] = -0.658;
+//		imu_data.magnetic[2] = 0.743;
+
+		if (delta_t == 0){
+			delta_t = 20e-3;
+		}
+		else{
+			delta_t = (double)(imu_data.time - prev_t);
+		}
+		prev_t = imu_data.time;
+		run_ekf(delta_t, imu_data.rate, imu_data.acceleration, imu_data.magnetic, &q[0], &b[0]);
+		double ypr[3] = {0};
+		q2ypr(q, ypr);;
+		printf("%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f|%7.3f,%7.3f,%7.3f\r\n", q[0], q[1], q[2], q[3], b[0], b[1], b[2], ypr[0], ypr[1], ypr[2]);
+		//printf("%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f\r\n", q[0], q[1], q[2], q[3], b[0]*180/M_PI, b[1]*180/M_PI, b[2]*180/M_PI);
 	}
 
-	closeSerialComms(hSerial);
+	fclose(ifp);
+	//closeSerialComms(hSerial);
 
 	// exit normally
 	return 0;

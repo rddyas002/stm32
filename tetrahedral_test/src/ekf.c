@@ -106,6 +106,7 @@ void run_ekf(double Ts, float gyro[3], float accel[3], float magnetic[3], double
 	// update phase
 	updateStateAndCovariance(x_f64_a, P_f64_a, R_f64_a, y);
 
+	normalise64(&x_f64_a[0], 4);
 	memcpy(q, &x_f64_a[0], sizeof(double)*4);
 	memcpy(w, &x_f64_a[4], sizeof(double)*3);
 }
@@ -145,7 +146,7 @@ void propagateState(double x[7], double u[3], double Ts){
 	}
 
 	// normalise
-	normalise64(q_next, 4);
+	normalise64(&q_next[0], 4);
 	memcpy(&x[0], &q_next[0], 4*sizeof(double));	// bias remains the same
 }
 
