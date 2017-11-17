@@ -170,21 +170,22 @@ int main(void) {
 				delta_t = imu_data.time - prev_time;
 				prev_time = imu_data.time;
 			}
-/*
-			delta_t = 20e-3;
-			imu_data.rate[0] = -0.032;
-			imu_data.rate[1] = 0.022;
-			imu_data.rate[2] = -0.011;
-			imu_data.acceleration[0] = 0.001;
-			imu_data.acceleration[1] = 0.015;
-			imu_data.acceleration[2] = -1.0;
-			imu_data.magnetic[0] = 0.124;
-			imu_data.magnetic[1] = -0.658;
-			imu_data.magnetic[2] = 0.743;
-*/
+
 			GPIO_WriteBit(GPIOD, GPIO_Pin_12, Bit_SET);
 			run_ekf(delta_t, imu_data.rate, imu_data.acceleration, imu_data.magnetic, &q[0], &b[0]);
+			q2ypr(q, ypr);
+			// send debug info
+			/*
+			int len = sprintf(&buffer[0], "%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\r\n",
+					imu_data.time,
+					imu_data.rate[0], imu_data.rate[1], imu_data.rate[2],
+					imu_data.acceleration[0], imu_data.acceleration[1], imu_data.acceleration[2],
+					imu_data.magnetic[0],imu_data.magnetic[1],imu_data.magnetic[2]);
+					*/
+			int len = sprintf(&buffer[0], "%5.2f,%5.2f,%5.2f\r\n",ypr[0],ypr[1],ypr[2]);
+			USART_send(USART2, &buffer[0], len);
 			GPIO_WriteBit(GPIOD, GPIO_Pin_12, Bit_RESET);
+
 	//		int len = sprintf(&buffer[0], "%6.2f%6.2f,%6.2f,%6.2f\r\n",
 		//			q[0],q[1],q[2],q[3]);
 	//		USART_send(USART2, &buffer[0], len);
@@ -204,7 +205,7 @@ int main(void) {
 					imu_data.acceleration[0], imu_data.acceleration[1], imu_data.acceleration[2],
 					imu_data.magnetic[0],imu_data.magnetic[1],imu_data.magnetic[2]);
 */
-			q2ypr(q, ypr);
+			//q2ypr(q, ypr);
 			//int len = sprintf(&buffer[0], "%5.2f,%5.2f,%5.2f\r\n",ypr32[0],ypr32[1],ypr32[2]);
 			//int len = sprintf(&buffer[0], "%5.2f:%5.2f,%5.2f,%5.2f|%5.2f,%5.2f,%5.2f|%5.2f,%5.2f,%5.2f\r\n",
 			//	q[0],q[1],q[2],q[3],b[0],b[1],b[2],imu_data.rate[0], imu_data.rate[1], imu_data.rate[2]);
@@ -214,13 +215,13 @@ int main(void) {
 			//GPIO_ToggleBits(GPIOD, GPIO_Pin_12);
 			flag10ms = false;
 		}
-
+/*
 		if (flag100ms){
 			int len = sprintf(&buffer[0], "%5.2f,%5.2f,%5.2f\r\n",ypr[0],ypr[1],ypr[2]);
 //			int len = sprintf(&buffer[0], "%f,%f,%f,%f\r\n",q[0],q[1],q[2],q[3]);
 			USART_sendInt(&buffer[0], len);
 			flag100ms = false;
 		}
-
+*/
 	}
 }

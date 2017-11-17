@@ -205,6 +205,9 @@ int main(int argc, char *argv[]){
 			delta_t = (double)(imu_data.time - prev_t);
 		}
 		prev_t = imu_data.time;
+		bool stop = false;
+		if (imu_data.time > 20.7)
+			stop = true;
 		run_ekf(delta_t, imu_data.rate, imu_data.acceleration, imu_data.magnetic, &q[0], &b[0]);
 		double ypr[3] = {0};
 		q2ypr(q, ypr);

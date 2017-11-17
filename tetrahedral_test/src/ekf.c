@@ -71,21 +71,6 @@ void init_ekf(imu_data_s * imu_data){
 		ywf_f64[i+3] = (double)imu_data->mag_offset[i];
 		x_f64_a[i+4] = (double)imu_data->gyro_offset[i];
 	}
-/*
-	ywf_f64[0] = 0.0039;
-	ywf_f64[1] = 0.0173;
-	ywf_f64[2] = -1;
-	ywf_f64[3] = 0.1224;
-	ywf_f64[4] = -0.6577;
-	ywf_f64[5] = 0.7433;
-	x_f64_a[0] = 1;
-	x_f64_a[1] = 0;
-	x_f64_a[2] = 0;
-	x_f64_a[3] = 0;
-	x_f64_a[4] = 0;
-	x_f64_a[5] = 0;
-	x_f64_a[6] = 0;
-*/
 }
 
 void run_ekf(double Ts, float gyro[3], float accel[3], float magnetic[3], double * q, double * w){
@@ -258,10 +243,10 @@ void computeW(double W[7][6], double Ts, double x[7]){
 }
 
 void propagateCovariance(double P[7][7], double Ts, double gyro[3], double Q[6][6]){
-	double F[7][7];
-	double Ft[7][7];
-	double W[7][6];
-	double Wt[6][7];
+	double F[7][7] = {{0},{0}};
+	double Ft[7][7] = {{0},{0}};
+	double W[7][6] = {{0},{0}};
+	double Wt[6][7] = {{0},{0}};
 	double FP[7][7] = {{0},{0}};
 	double FPFt[7][7] = {{0},{0}};
 	double WQ[7][6] = {{0},{0}};
@@ -377,7 +362,7 @@ int computeKalmanGain(double K[7][6], double H[6][7], double P[7][7], double R[6
 void computeInnovation(double x[7], double y[6], double ywf_f32[6], double inno[6]){
 	double Rw2b[3][3];
 	double q[4];
-	copy64v(q, x, 4);
+	copy64v(&q[0], &x[0], 4);
 	q2R(Rw2b, q);
 
 	double y_hat[6] = {0};
@@ -389,7 +374,7 @@ void computeInnovation(double x[7], double y[6], double ywf_f32[6], double inno[
 		}
 	}
 
-	sub64v(y, y_hat, inno, 6);
+	sub64v(&y[0], &y_hat[0], &inno[0], 6);
 }
 
 void updateState(double x[7], double K[7][6], double innovation[6]){
@@ -404,7 +389,7 @@ void updateState(double x[7], double K[7][6], double innovation[6]){
 		}
 	}
 
-	add64v(x_cpy, Ke, x, 7);
+	add64v(&x_cpy[0], &Ke[0], &x[0], 7);
 }
 
 void updateCovariance(double P[7][7], double K[7][6], double H[6][7], double R[6][6]){
@@ -452,7 +437,7 @@ void q2R(double R[3][3], double q[4]){
 
 	R[2][0] = 2.0*(q[1]*q[3] + q[0]*q[2]);
 	R[2][1] = 2.0*(q[2]*q[3] - q[0]*q[1]);
-	R[2][2] = q[0]*q[0] - q[1]*q[1] - q[2]*q[2] - q[3]*q[3];
+	R[2][2] = q[0]*q[0] - q[1]*q[1] - q[2]*q[2] + q[3]*q[3];
 }
 
 void q2ypr(double q[4], double ypr[3]){
