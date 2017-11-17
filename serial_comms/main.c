@@ -118,8 +118,10 @@ int main(int argc, char *argv[]){
 	*/
 	imu_data_s imu_data;
 
-	FILE *ifp;
-	ifp = fopen("C:\\Users\\RDDYA\\Documents\\stm32\\serial_comms\\Debug\\imu.csv", "r");
+	FILE *ifp, *ofp;
+	//ifp = fopen("C:\\Users\\RDDYA\\Documents\\stm32\\serial_comms\\Debug\\imu.csv", "r");
+	ifp = fopen("C:\\work\\stm32\\serial_comms\\Debug\\imu.csv", "r");
+	ofp = fopen("C:\\work\\stm32\\serial_comms\\Debug\\imu_out.csv", "w");
 
 	if (ifp == NULL) {
 	  fprintf(stderr, "Can't open input file in.list!\n");
@@ -205,12 +207,12 @@ int main(int argc, char *argv[]){
 		prev_t = imu_data.time;
 		run_ekf(delta_t, imu_data.rate, imu_data.acceleration, imu_data.magnetic, &q[0], &b[0]);
 		double ypr[3] = {0};
-		q2ypr(q, ypr);;
-		printf("%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f|%7.3f,%7.3f,%7.3f\r\n", q[0], q[1], q[2], q[3], b[0], b[1], b[2], ypr[0], ypr[1], ypr[2]);
-		//printf("%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f\r\n", q[0], q[1], q[2], q[3], b[0]*180/M_PI, b[1]*180/M_PI, b[2]*180/M_PI);
+		q2ypr(q, ypr);
+		fprintf(ofp,"%f,%f,%f,%f,%f,%f,%f,%f,%f,%f\n", q[0], q[1], q[2], q[3], b[0], b[1], b[2], ypr[0], ypr[1], ypr[2]);
 	}
 
 	fclose(ifp);
+	fclose(ofp);
 	//closeSerialComms(hSerial);
 
 	// exit normally
