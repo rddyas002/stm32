@@ -12,6 +12,7 @@
 #include "gpio.h"
 #include "CciProtocol.h"
 #include "ekf.h"
+#include "ekf32.h"
 
 #include <arm_math.h>
 
@@ -135,12 +136,14 @@ void computeGyroStats(imu_data_s * imu_data){
 
 int main(void) {
 	imu_data_s imu_data;
-	float64_t ypr[3] = {0};
-	float32_t ypr32[3] = {0};
 	uint8_t buffer[256];
 
-	float64_t b[3] = {0};
-	float64_t q[4] = {0};
+	float32_t b_32[3] = {0};
+	float32_t q_32[4] = {0};
+	float32_t ypr_32[3] = {0};
+	float64_t b_64[3] = {0};
+	float64_t q_64[4] = {0};
+	float64_t ypr_64[3] = {0};
 
 	// enable FPU full access
 	SCB->CPACR |= ((3UL << 10 * 2) | (3UL << 11 * 2)); /* set CP10 and CP11 Full Access */
@@ -153,9 +156,13 @@ int main(void) {
 	init_USART2(115200);
 	init_cci(129);
 	computeInitMeasurementFrame(&imu_data);
+
 	init_ekf(&imu_data);
-	float64_t prev_time = 0;
-	float64_t delta_t = 0;
+	init_ekf_32(&imu_data);
+
+	float32_t prev_time = 0;
+	float32_t delta_t_32 = 0;
+	float64_t delta_t_64 = 0;
 
 	while (1) {
 		if (flag10ms){
@@ -163,56 +170,26 @@ int main(void) {
 			read_mag(I2C1, imu_data.magnetic);	// uT
 			imu_data.time = (float)SysTickCounter*1.0e-3;
 			if (prev_time == 0){
-				delta_t = 20e-3;
-				prev_time = imu_data.time;
+				delta_t_32 = 20e-3f;
+				delta_t_64 = 20e-3;
 			}
 			else{
-				delta_t = imu_data.time - prev_time;
-				prev_time = imu_data.time;
+				delta_t_32 = imu_data.time - prev_time;
+				delta_t_64 = (double)delta_t_32;
 			}
+			prev_time = imu_data.time;
 
 			GPIO_WriteBit(GPIOD, GPIO_Pin_12, Bit_SET);
-			run_ekf(delta_t, imu_data.rate, imu_data.acceleration, imu_data.magnetic, &q[0], &b[0]);
-			q2ypr(q, ypr);
-			// send debug info
-			/*
-			int len = sprintf(&buffer[0], "%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\r\n",
-					imu_data.time,
-					imu_data.rate[0], imu_data.rate[1], imu_data.rate[2],
-					imu_data.acceleration[0], imu_data.acceleration[1], imu_data.acceleration[2],
-					imu_data.magnetic[0],imu_data.magnetic[1],imu_data.magnetic[2]);
-					*/
-			int len = sprintf(&buffer[0], "%5.2f,%5.2f,%5.2f\r\n",ypr[0],ypr[1],ypr[2]);
-			USART_send(USART2, &buffer[0], len);
+			run_ekf_32(delta_t_32, imu_data.rate, imu_data.acceleration, imu_data.magnetic, &q_32[0], &b_32[0]);
+			//run_ekf(delta_t_64, imu_data.rate, imu_data.acceleration, imu_data.magnetic, &q_64[0], &b_64[0]);
+			q2ypr_32(q_32, ypr_32);
+			//q2ypr(q_64, ypr_64);
 			GPIO_WriteBit(GPIOD, GPIO_Pin_12, Bit_RESET);
 
-	//		int len = sprintf(&buffer[0], "%6.2f%6.2f,%6.2f,%6.2f\r\n",
-		//			q[0],q[1],q[2],q[3]);
-	//		USART_send(USART2, &buffer[0], len);
+			int len = sprintf((char *)&buffer[0], "%5.2f,%5.2f,%5.2f|%5.2f,%5.2f,%5.2f\r\n",ypr_32[0],ypr_32[1],ypr_32[2],ypr_64[0],ypr_64[1],ypr_64[2]);
+			USART_send(USART2, &buffer[0], len);
 
-//			triadComputation(imu_data.accel_offset, imu_data.mag_offset, imu_data.acceleration, imu_data.magnetic, ypr32);
-/*
-			 int len = sprintf(&buffer[0], "%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f\r\n",
-					imu_data.time,
-					imu_data.rate[0], imu_data.rate[1], imu_data.rate[2],
-					imu_data.acceleration[0], imu_data.acceleration[1], imu_data.acceleration[2],
-					imu_data.magnetic[0],imu_data.magnetic[1],imu_data.magnetic[2]);
-					*/
-/*
-			 int len = sprintf(&buffer[0], "%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.4f,%.4f,%.4f\r\n",
-					imu_data.time,
-					imu_data.rate[0], imu_data.rate[1], imu_data.rate[2],
-					imu_data.acceleration[0], imu_data.acceleration[1], imu_data.acceleration[2],
-					imu_data.magnetic[0],imu_data.magnetic[1],imu_data.magnetic[2]);
-*/
-			//q2ypr(q, ypr);
-			//int len = sprintf(&buffer[0], "%5.2f,%5.2f,%5.2f\r\n",ypr32[0],ypr32[1],ypr32[2]);
-			//int len = sprintf(&buffer[0], "%5.2f:%5.2f,%5.2f,%5.2f|%5.2f,%5.2f,%5.2f|%5.2f,%5.2f,%5.2f\r\n",
-			//	q[0],q[1],q[2],q[3],b[0],b[1],b[2],imu_data.rate[0], imu_data.rate[1], imu_data.rate[2]);
-			//USART_sendInt(&imu_data, sizeof(imu_data_s));
-			 //USART_send(USART2, &imu_data, sizeof(imu_data_s));
-			//USART_send(USART2, &buffer[0], len);
-			//GPIO_ToggleBits(GPIOD, GPIO_Pin_12);
+
 			flag10ms = false;
 		}
 /*

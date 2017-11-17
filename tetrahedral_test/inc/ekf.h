@@ -15,6 +15,8 @@
 
 #include "matrix_math.h"
 
+#define M_PI_f		3.14159265358979323846f
+
 typedef struct{
 	float rate[3];			// dps
 	float acceleration[3];	// g
@@ -27,8 +29,6 @@ typedef struct{
 	float mag_offset[3];
 	float time;
 }__attribute__((packed)) imu_data_s;
-
-#define M_PI_f		3.14159265358979323846
 
 void init_ekf(imu_data_s * imu_data);
 void run_ekf(double Ts, float gyro[3], float accel[3], float magnetic[3], double * q, double * w);

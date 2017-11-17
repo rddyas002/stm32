@@ -8,12 +8,14 @@
 #include "MPU6050.h"
 
 #define MPU6050_SCALE_ACCEL 	(16384.0f)
-#define MPU6050_SCALE_GYRO 		(32.8f)
+#define MPU6050_SCALE_GYRO_1000			(32.8f)
+#define MPU6050_SCALE_GYRO_2000 		(16.4f)
+#define MPU6050_SCALE_GYRO MPU6050_SCALE_GYRO_2000
 
 void MPU6050_Initialize(void)
 {
     MPU6050_SetClockSource(MPU6050_CLOCK_PLL_XGYRO);
-    MPU6050_SetFullScaleGyroRange(MPU6050_GYRO_FS_1000);
+    MPU6050_SetFullScaleGyroRange(MPU6050_GYRO_FS_2000);
     MPU6050_SetFullScaleAccelRange(MPU6050_ACCEL_FS_2);
     MPU6050_SetSleepModeStatus(DISABLE);
     MPU6050_SetI2CBypass();

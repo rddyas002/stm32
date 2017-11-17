@@ -1,19 +1,8 @@
 #include "ekf.h"
 //#define ARM
-// State error covariance matrix
-const double P0_f32_a[7][7] =
-{
-	{1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
-	{0.0, 1, 0.0, 0.0, 0.0, 0.0, 0.0},
-	{0.0, 0.0, 1, 0.0, 0.0, 0.0, 0.0},
-	{0.0, 0.0, 0.0, 1, 0.0, 0.0, 0.0},
-	{0.0, 0.0, 0.0, 0.0, 1, 0.0, 0.0},
-	{0.0, 0.0, 0.0, 0.0, 0.0, 1, 0.0},
-	{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1}
-};
 
 // State vector
-const double x0_f32_a[7] =
+const double x0_f64_a[7] =
 {
 	1.0,
 	0.0,
@@ -51,7 +40,7 @@ void init_ekf(imu_data_s * imu_data){
 
 	// initial state
 	for (i = 0; i < 7; i++)
-		x_f64_a[i] = x0_f32_a[i];
+		x_f64_a[i] = x0_f64_a[i];
 
 	// process noise - gyro and bias
 	for (i = 0; i < 3; i++)
