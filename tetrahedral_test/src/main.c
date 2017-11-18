@@ -27,7 +27,7 @@ __IO bool flag100ms = false;
 void timingHandler(void){
 	SysTickCounter++;
 
-	if(!(SysTickCounter % 20))
+	if(!(SysTickCounter % 10))
 		flag10ms = true;
 	if(!(SysTickCounter % 100))
 		flag100ms = true;
@@ -138,6 +138,9 @@ int main(void) {
 	imu_data_s imu_data;
 	uint8_t buffer[256];
 
+	float32_t Q_diag[6] = {0.35e-5f,0.35e-5f,0.35e-5f,2.5e-8f,2.5e-8f,2.5e-8f};
+	float32_t R_diag[6] = {0.3e-4f,0.3e-4f,0.3e-4f,0.4e-4f,0.4e-4f,0.4e-4f};
+
 	float32_t b_32[3] = {0};
 	float32_t q_32[4] = {0};
 	float32_t ypr_32[3] = {0};
@@ -166,12 +169,14 @@ int main(void) {
 
 	while (1) {
 		if (flag10ms){
+			// read sensors
 			MPU6050_GetRawAccelGyro(&imu_data);
-			read_mag(I2C1, imu_data.magnetic);	// uT
+			read_mag(I2C1, imu_data.magnetic);
+			// calculate dt
 			imu_data.time = (float)SysTickCounter*1.0e-3;
 			if (prev_time == 0){
-				delta_t_32 = 20e-3f;
-				delta_t_64 = 20e-3;
+				delta_t_32 = 10e-3f;
+				delta_t_64 = 10e-3;
 			}
 			else{
 				delta_t_32 = imu_data.time - prev_time;
@@ -181,24 +186,18 @@ int main(void) {
 
 			GPIO_WriteBit(GPIOD, GPIO_Pin_12, Bit_SET);
 			run_ekf_32(delta_t_32, imu_data.rate, imu_data.acceleration, imu_data.magnetic, &q_32[0], &b_32[0]);
-			//run_ekf(delta_t_64, imu_data.rate, imu_data.acceleration, imu_data.magnetic, &q_64[0], &b_64[0]);
 			q2ypr_32(q_32, ypr_32);
-			//q2ypr(q_64, ypr_64);
 			GPIO_WriteBit(GPIOD, GPIO_Pin_12, Bit_RESET);
-
-			int len = sprintf((char *)&buffer[0], "%5.2f,%5.2f,%5.2f|%5.2f,%5.2f,%5.2f\r\n",ypr_32[0],ypr_32[1],ypr_32[2],ypr_64[0],ypr_64[1],ypr_64[2]);
-			USART_send(USART2, &buffer[0], len);
-
 
 			flag10ms = false;
 		}
-/*
+
 		if (flag100ms){
-			int len = sprintf(&buffer[0], "%5.2f,%5.2f,%5.2f\r\n",ypr[0],ypr[1],ypr[2]);
-//			int len = sprintf(&buffer[0], "%f,%f,%f,%f\r\n",q[0],q[1],q[2],q[3]);
+			int len = sprintf((char *)&buffer[0], "%5.2f,%5.2f,%5.2f|%5.2f,%5.2f,%5.2f\r\n",ypr_32[0],ypr_32[1],ypr_32[2],b_32[0],b_32[1],b_32[2]);
+			//USART_send(USART2, &buffer[0], len);
 			USART_sendInt(&buffer[0], len);
 			flag100ms = false;
 		}
-*/
+
 	}
 }
