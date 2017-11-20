@@ -13,7 +13,7 @@
 #include <stdlib.h>
 #include <time.h>
 
-double timeNow(void);
+double timeNow_us(void);
 double timeSince(double time_t0);
 
 #endif /* TIMING_H_ */

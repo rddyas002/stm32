@@ -292,9 +292,11 @@ bool navdata_init(void){
 }
 
 void close_navdata(void){
-	close(navdata.fd);
+	if (navdata.fd != NULL)
+		close(navdata.fd);
 #ifdef NAVDATA_LOGGING
-	close(navdata_file_p);
+	if (navdata_file_p != NULL)
+		close(navdata_file_p);
 #endif
 }
 

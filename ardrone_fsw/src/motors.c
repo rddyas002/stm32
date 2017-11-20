@@ -46,6 +46,8 @@
 #include <termios.h> /* POSIX terminal control definitions */
 #include <stdint.h>
 
+#include "timing.h"
+
 typedef struct {
 	float power[4]; //motor speed setting. 0.0=min power, 1.0=full power
 	uint16_t pwm[4];   //motor speed 0x00-0x1ff.  -- protected by mutex
@@ -96,6 +98,7 @@ static inline void actuators_ardrone_reset_flipflop(void)
 
 static void *motor_update(void *data __attribute__((unused)))
 {
+	double t0 = timeNow_us();
 	printf("Motor control thread started!\r\n");
 	while(1) {
 		//5000us = 200Hz update interval
@@ -103,6 +106,7 @@ static void *motor_update(void *data __attribute__((unused)))
 
 		pthread_mutex_lock(&mot_mutex);
 		actuators_ardrone_set_pwm(motor.pwm[0], motor.pwm[1], motor.pwm[2],	motor.pwm[3]);
+		actuators_ardrone_set_leds(motor.led[0], motor.led[1], motor.led[2], motor.led[3]);
 		pthread_mutex_unlock(&mot_mutex);
 	}
 	return NULL;
@@ -114,7 +118,7 @@ bool actuators_ardrone_init(void)
 	led_hw_values = 0;
 	for (i = 0; i < 4; i++){
 		motor.pwm[i] = 0;
-		motor.led[i] = 0;
+		motor.led[i] = MOT_LEDGREEN;
 		motor.power[i] = 0.0f;
 	}
 
@@ -164,7 +168,7 @@ bool actuators_ardrone_init(void)
 		gpio_clear(ARDRONE_GPIO_PORT, ARDRONE_GPIO_PIN_MOTOR1 + m);
 		actuators_ardrone_cmd(0xe0, reply, 2);
 		if (reply[0] != 0xe0 || reply[1] != 0x00) {
-			printf("motor%d cmd=0x%02x reply=0x%02x\n", m + 1, (int)reply[0], (int)reply[1]);
+			printf("motor%d cmd=0x%02x reply=0x%02x\r\n", m + 1, (int)reply[0], (int)reply[1]);
 		}
 		actuators_ardrone_cmd(m + 1, reply, 1);
 		gpio_set(ARDRONE_GPIO_PORT, ARDRONE_GPIO_PIN_MOTOR1 + m);
@@ -251,7 +255,6 @@ void actuators_ardrone_motor_status(void)
 
 #define BIT_NUMBER(VAL,BIT) (((VAL)>>BIT)&0x03)
 
-void actuators_ardrone_led_run(void);
 void actuators_ardrone_led_run(void)
 {
 	static uint32_t previous_led_hw_values = 0x00;
@@ -263,7 +266,6 @@ void actuators_ardrone_led_run(void)
 }
 
 void actuators_ardrone_set_power(float mot1, float mot2, float mot3, float mot4){
-	float pwm[4];
 	int i;
 
 	pthread_mutex_lock(&mot_mutex);
@@ -273,11 +275,14 @@ void actuators_ardrone_set_power(float mot1, float mot2, float mot3, float mot4)
 	motor.power[3] = mot4;
 
 	for(i = 0; i < 4; i++) {
+		// sat limits
 		if(motor.power[i] < 0.0) motor.power[i] = 0.0;
 		if(motor.power[i] > 1.0) motor.power[i] = 1.0;
-		pwm[i] = mot_pwm_min + motor.power[i]*(mot_pwm_max-mot_pwm_min);
-		if(pwm[i] < mot_pwm_min) pwm[i] = mot_pwm_min;
-		if(pwm[i] > mot_pwm_max) pwm[i] = mot_pwm_max;
+		// scale
+		motor.pwm[i] = mot_pwm_min + (uint16_t)(motor.power[i]*(mot_pwm_max-mot_pwm_min));
+		// ensure sat not violated
+		if(motor.pwm[i] < mot_pwm_min) motor.pwm[i] = mot_pwm_min;
+		if(motor.pwm[i] > mot_pwm_max) motor.pwm[i] = mot_pwm_max;
 	}
 	pthread_mutex_unlock(&mot_mutex);
 }
@@ -343,5 +348,6 @@ void actuators_ardrone_set_leds(uint8_t led0, uint8_t led1, uint8_t led2, uint8_
 
 void actuators_ardrone_close(void)
 {
-	close(actuator_ardrone2_fd);
+	if (actuator_ardrone2_fd != NULL)
+		close(actuator_ardrone2_fd);
 }

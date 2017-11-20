@@ -1,10 +1,11 @@
+#include <math.h>
 #include "timing.h"
 
 
-double timeNow(void){
+double timeNow_us(void){
 	struct timespec tv;
 	clock_gettime(CLOCK_MONOTONIC, &tv);
-	return ((tv.tv_sec)*1e6 + (tv.tv_nsec)/1e3);
+	return floor((tv.tv_sec)*1e6 + (tv.tv_nsec)/1e3 + 0.5);
 }
 
 double timeSince(double time_t0){

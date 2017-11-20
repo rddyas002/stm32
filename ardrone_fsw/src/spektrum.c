@@ -103,9 +103,11 @@ bool spektrum_init(void) {
 }
 
 void close_spektrum(void){
-	close(spektrum_fd);
+	if (spektrum_fd != NULL)
+		close(spektrum_fd);
 #ifdef SPEKTRUM_LOGGING
-	close(output_file_p);
+	if (output_file_p != NULL)
+		close(output_file_p);
 #endif
 }
 
@@ -168,7 +170,7 @@ void decodePacket(char bytes){
 	printBuffer();
 #endif
 #ifdef SPEKTRUM_LOGGING
-	fprintf(output_file_p,"%.2f,%.2f,%.2f,%.2f,%.2f\n",
+	fprintf(output_file_p,"%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\n",
 			reference_command[0],
 			reference_command[1],
 			reference_command[2],
