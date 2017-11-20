@@ -287,6 +287,15 @@ void actuators_ardrone_set_power(float mot1, float mot2, float mot3, float mot4)
 	pthread_mutex_unlock(&mot_mutex);
 }
 
+void actuators_ardrone_commit_color(uint8_t LED1, uint8_t LED2, uint8_t LED3, uint8_t LED4){
+	pthread_mutex_lock(&mot_mutex);
+	motor.led[0] = LED1;
+	motor.led[1] = LED2;
+	motor.led[2] = LED3;
+	motor.led[3] = LED4;
+	pthread_mutex_unlock(&mot_mutex);
+}
+
 void actuators_stop(void){
 	pthread_mutex_lock(&mot_mutex);
 	motor.power[0] = 0.0;

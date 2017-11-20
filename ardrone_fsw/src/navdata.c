@@ -119,10 +119,6 @@ static void *navdata_read(void *data __attribute__((unused)))
 				}
 
 				struct navdata_measure_t *new_measurement = (struct navdata_measure_t *)navdata_buffer;
-				float sonar_meas = 0;
-			    if (navdata.measure.ultrasound >> 15) {
-			      sonar_meas = (float)((navdata.measure.ultrasound & 0x7FFF) - SONAR_OFFSET) * SONAR_SCALE;
-			    }
 				if (checksum == new_measurement->chksum){
 #ifdef NAVDATA_LOGGING
 					fprintf(navdata_file_p, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%u\n",

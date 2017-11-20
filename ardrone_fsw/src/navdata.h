@@ -47,7 +47,7 @@
 #include <pthread.h>
 #include <stdbool.h>
 
-#define NAVDATA_LOGGING
+//#define NAVDATA_LOGGING
 #define NAVDATA_LOGFILE "navdata_log.csv"
 
 /**
