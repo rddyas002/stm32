@@ -44,7 +44,10 @@ struct gpio_direction {
 };
 
 
-void gpio_setup_output(uint32_t port, uint16_t pin);
 void gpio_set(uint32_t port, uint16_t pin);
+void gpio_clear(uint32_t port, uint16_t pin);
+void gpio_setup_input(uint32_t port, uint16_t pin);
+void gpio_setup_output(uint32_t port, uint16_t pin);
+uint16_t gpio_get(uint32_t port, uint16_t pin);
 
 #endif /* GPIO_H_ */

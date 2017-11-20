@@ -71,26 +71,35 @@ static void *navdata_read(void *data __attribute__((unused)))
        i.e. buffer has been copied in navdata_update */
 		pthread_mutex_lock(&navdata_mutex);
 		while (navdata_available) {
+			navdata_available = false;
+
+		printf("%7d,%7d,%7d|%7d,%7d,%7d|%7d,%7d,%7d|%u|%u,%u\n",
+				navdata.measure.vx, navdata.measure.vy, navdata.measure.vz,
+				navdata.measure.ax, navdata.measure.ay, navdata.measure.az,
+				navdata.measure.mx, navdata.measure.my, navdata.measure.mz,
+				navdata.measure.ultrasound, navdata.measure.temperature_gyro, navdata.measure.temperature_acc);
+
 			pthread_cond_wait(&navdata_cond, &navdata_mutex);
 		}
 		pthread_mutex_unlock(&navdata_mutex);
 
 		/* Read new bytes */
-		int newbytes = read(navdata.fd, navdata_buffer + buffer_idx, NAVDATA_PACKET_SIZE - buffer_idx);
+		int newbytes = read(navdata.fd, &navdata_buffer[0] + buffer_idx, NAVDATA_PACKET_SIZE - buffer_idx);
 
-		/* When there was no signal interrupt */
+
+		// When there was no signal interrupt
 		if (newbytes > 0) {
 			buffer_idx += newbytes;
 			navdata.totalBytesRead += newbytes;
 		}
 
-		/* If we got a full packet */
+		// If we got a full packet
 		if (buffer_idx >= NAVDATA_PACKET_SIZE) {
-			/* check if the start byte is correct */
+			// check if the start byte is correct
 			if (navdata_buffer[0] != NAVDATA_START_BYTE) {
 				uint8_t *pint = memchr(navdata_buffer, NAVDATA_START_BYTE, buffer_idx);
 
-				/* Check if we found the start byte in the read data */
+				// Check if we found the start byte in the read data
 				if (pint != NULL) {
 					memmove(navdata_buffer, pint, NAVDATA_PACKET_SIZE - (pint - navdata_buffer));
 					buffer_idx = pint - navdata_buffer;
@@ -101,10 +110,10 @@ static void *navdata_read(void *data __attribute__((unused)))
 				continue;
 			}
 
-			/* full packet read with startbyte at the beginning, reset insert index */
+			// full packet read with startbyte at the beginning, reset insert index
 			buffer_idx = 0;
 
-			/* Calculate the checksum */
+			// Calculate the checksum
 			uint16_t checksum = 0;
 			int i;
 			for (i = 2; i < NAVDATA_PACKET_SIZE - 2; i += 2) {
@@ -113,15 +122,16 @@ static void *navdata_read(void *data __attribute__((unused)))
 
 			struct navdata_measure_t *new_measurement = (struct navdata_measure_t *)navdata_buffer;
 
-			/* Check if the checksum is OK */
+			// Check if the checksum is OK
 			if (new_measurement->chksum != checksum) {
 				fprintf(stderr, "[navdata] Checksum error [calculated: %d] [packet: %d] [diff: %d]\n",
 						checksum, new_measurement->chksum, checksum - new_measurement->chksum);
 				navdata.checksum_errors++;
+
 				continue;
 			}
 
-			/* Set flag that we have new valid navdata */
+			// Set flag that we have new valid navdata
 			pthread_mutex_lock(&navdata_mutex);
 			navdata_available = true;
 			pthread_mutex_unlock(&navdata_mutex);
@@ -219,6 +229,18 @@ void navdata_update()
 			navdata.lost_imu_frames++;
 		}
 		navdata.last_packet_number = navdata.measure.nu_trame;
+
+	    /* Invert byte order so that TELEMETRY works better */
+	    uint8_t tmp;
+	    uint8_t *p = (uint8_t *) & (navdata.measure.pressure);
+	    tmp = p[0];
+	    p[0] = p[1];
+	    p[1] = tmp;
+	    p = (uint8_t *) & (navdata.measure.temperature_pressure);
+	    tmp = p[0];
+	    p[0] = p[1];
+	    p[1] = tmp;
+
 		navdata.packetsRead++;
 	} else {
 		/* no new packet available, still unlock mutex again */
