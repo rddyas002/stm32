@@ -47,6 +47,9 @@
 #include <pthread.h>
 #include <stdbool.h>
 
+#define NAVDATA_LOGGING
+#define NAVDATA_LOGFILE "navdata_log.csv"
+
 /**
  * Main navdata structure from the navdata board
  * This is received from the navdata board at ~200Hz
@@ -115,6 +118,7 @@ struct bmp180_calib_t {
 /* Navdata board defines */
 #define NAVDATA_PACKET_SIZE       60
 #define NAVDATA_START_BYTE        0x3A
+#define NAVDATA_SECOND_BYTE       0x00
 #define NAVDATA_CMD_START         0x01
 #define NAVDATA_CMD_STOP          0x02
 #define NAVDATA_CMD_BARO_CALIB    0x17
@@ -144,6 +148,7 @@ extern struct navdata_t navdata;
 
 
 bool navdata_init(void);
+void close_navdata(void);
 void navdata_update(void);
 int16_t navdata_height(void);
 

@@ -9,7 +9,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/types.h>
-#include <signal.h>
+#include <sys/signal.h>
 #include <unistd.h>
 #include <errno.h>
 #include <poll.h>
@@ -25,7 +25,7 @@
 #define PARITYON 0
 #define MODEMDEVICE "/dev/ttyUSB0"
 #define _POSIX_SOURCE 1         //POSIX compliant source
-#define SPEKTRUM_RX_LOGFILE "log.txt"
+#define SPEKTRUM_RX_LOGFILE "spektrum_log.csv"
 
 #define SPEKTRUMRX_m0 (1.1721)
 #define SPEKTRUMRX_c0 (940)
@@ -39,6 +39,8 @@
 #define SPEKTRUM_CH4 (0b00010000)
 #define SPEKTRUM_CH5 (0b00010100)
 #define SPEKTRUM_CH6 (0b00011000)
+
+#define SPEKTRUM_LOGGING
 
 bool spektrum_init(void);
 void close_spektrum(void);

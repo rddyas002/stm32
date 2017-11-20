@@ -1,14 +1,41 @@
 #include "navdata.h"
 #include "gpio.h"
 
+/** Sonar offset.
+ *  Offset value in ADC
+ *  equals to the ADC value so that height is zero
+ */
+#ifndef SONAR_OFFSET
+#define SONAR_OFFSET 880
+#endif
+
+/** Sonar scale.
+ *  Sensor sensitivity in m/adc (float)
+ */
+#ifndef SONAR_SCALE
+#define SONAR_SCALE 0.00047
+#endif
+
+
 struct navdata_t navdata;
 static uint8_t navdata_buffer[NAVDATA_PACKET_SIZE];
 static bool navdata_available = false;
+volatile static bool navdata_bytes_available = false;
 
 /* syncronization variables */
 static pthread_mutex_t navdata_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t  navdata_cond  = PTHREAD_COND_INITIALIZER;
 pthread_t navdata_thread;
+
+#ifdef NAVDATA_LOGGING
+	FILE *navdata_file_p;
+#endif
+
+void signal_handler_navdata (int status){
+	ioctl(navdata.fd, FIONREAD, &navdata_bytes_available);
+	if (navdata_bytes_available > 60)
+		pthread_cond_signal(&navdata_cond);
+}
 
 ssize_t full_write(int fd, const uint8_t *buf, size_t count)
 {
@@ -66,10 +93,56 @@ static void *navdata_read(void *data __attribute__((unused)))
 	/* Buffer insert index for reading/writing */
 	static uint8_t buffer_idx = 0;
 
-	while (true) {
+	printf("[navdata] Read thread started!\n");
 
-		/* Wait until we are notified to read next data,
-       i.e. buffer has been copied in navdata_update */
+	while (true) {
+		pthread_mutex_lock(&navdata_mutex);
+		pthread_cond_wait(&navdata_cond, &navdata_mutex);
+		pthread_mutex_unlock(&navdata_mutex);
+		// 60 bytes are available
+		int newbytes = read(navdata.fd, &navdata_buffer[0], NAVDATA_PACKET_SIZE);
+/*		int i;
+		for (i = 0; i < newbytes; i++)
+			printf("0x%.2X ",navdata_buffer[i]);
+		printf("\r\n\r\n");
+*/
+		if (navdata_buffer[0] == NAVDATA_START_BYTE){
+			if (navdata_buffer[1] == NAVDATA_SECOND_BYTE){
+				// full packet read with startbyte at the beginning, reset insert index
+				buffer_idx = 0;
+
+				// Calculate the checksum
+				uint16_t checksum = 0;
+				int i;
+				for (i = 2; i < NAVDATA_PACKET_SIZE - 2; i += 2) {
+					checksum += navdata_buffer[i] + (navdata_buffer[i + 1] << 8);
+				}
+
+				struct navdata_measure_t *new_measurement = (struct navdata_measure_t *)navdata_buffer;
+				float sonar_meas = 0;
+			    if (navdata.measure.ultrasound >> 15) {
+			      sonar_meas = (float)((navdata.measure.ultrasound & 0x7FFF) - SONAR_OFFSET) * SONAR_SCALE;
+			    }
+				if (checksum == new_measurement->chksum){
+#ifdef NAVDATA_LOGGING
+					fprintf(navdata_file_p, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%u\n",
+							new_measurement->vx, new_measurement->vy, new_measurement->vz,
+							new_measurement->ax, new_measurement->ay, new_measurement->az,
+							new_measurement->mx, new_measurement->my, new_measurement->mz,
+							new_measurement->ultrasound);
+#else
+					printf("%7d%7d%7d%7d%7d%7d%7d%7d%7d%7u\n",
+							new_measurement->vx, new_measurement->vy, new_measurement->vz,
+							new_measurement->ax, new_measurement->ay, new_measurement->az,
+							new_measurement->mx, new_measurement->my, new_measurement->mz,
+							new_measurement->ultrasound);
+#endif
+				}
+			}
+		}
+
+/*
+		// Wait until we are notified to read next data, i.e. buffer has been copied in navdata_update
 		pthread_mutex_lock(&navdata_mutex);
 		while (navdata_available) {
 			navdata_available = false;
@@ -77,7 +150,7 @@ static void *navdata_read(void *data __attribute__((unused)))
 		}
 		pthread_mutex_unlock(&navdata_mutex);
 
-		/* Read new bytes */
+		// Read new bytes
 		int newbytes = read(navdata.fd, &navdata_buffer[0] + buffer_idx, NAVDATA_PACKET_SIZE - buffer_idx);
 
 
@@ -130,6 +203,7 @@ static void *navdata_read(void *data __attribute__((unused)))
 			navdata_available = true;
 			pthread_mutex_unlock(&navdata_mutex);
 		}
+		*/
 	}
 
 	return NULL;
@@ -137,6 +211,8 @@ static void *navdata_read(void *data __attribute__((unused)))
 
 
 bool navdata_init(void){
+	struct sigaction saio;
+
 	/* Check if the FD isn't already initialized */
 	if (navdata.fd <= 0) {
 		navdata.fd = open("/dev/ttyO1", O_RDWR | O_NOCTTY); /* O_NONBLOCK doesn't work */
@@ -146,8 +222,19 @@ bool navdata_init(void){
 			return false;
 		}
 
+		// install the signal handler before making the device asynchronous
+		saio.sa_handler = signal_handler_navdata;
+		sigemptyset(&saio.sa_mask);
+		saio.sa_flags = 0;
+		saio.sa_restorer = NULL;
+		sigaction(SIGIO,&saio,NULL);
+
+		// allow the process to receive SIGIO
+		fcntl(navdata.fd, F_SETOWN, getpid());
+		fcntl(navdata.fd, F_SETFL, FASYNC);
+
 		/* Update the settings of the UART connection */
-		fcntl(navdata.fd, F_SETFL, 0); /* read calls are non blocking */
+	//	fcntl(navdata.fd, F_SETFL, 0); /* read calls are non blocking */
 		/* set port options */
 		struct termios options;
 		/* Get the current options for the port */
@@ -191,9 +278,24 @@ bool navdata_init(void){
 		printf("[navdata] Could not create navdata reading thread!\n");
 		return false;
 	}
-	printf("[navdata] Read thread started!\n");
+
+#ifdef NAVDATA_LOGGING
+	// open file for logging
+	navdata_file_p = fopen(NAVDATA_LOGFILE, "w");
+	if (navdata_file_p == NULL) {
+	  fprintf(stderr, "[navdata]Can't open output file!\n");
+	  return false;
+	}
+#endif
 
 	return true;
+}
+
+void close_navdata(void){
+	close(navdata.fd);
+#ifdef NAVDATA_LOGGING
+	close(navdata_file_p);
+#endif
 }
 
 /**

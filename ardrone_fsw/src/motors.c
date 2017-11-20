@@ -54,7 +54,7 @@ typedef struct {
 }motor_t;
 
 pthread_t mot_thread;
-pthread_mutex_t mot_mutex;
+static pthread_mutex_t mot_mutex = PTHREAD_MUTEX_INITIALIZER;
 motor_t motor;
 
 /**
