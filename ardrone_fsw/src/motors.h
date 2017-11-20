@@ -9,6 +9,7 @@
 #define MOTORS_H_
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #ifndef ACTUATORS_ARDRONE_NB
 #define ACTUATORS_ARDRONE_NB 4
@@ -16,24 +17,17 @@
 
 #define SERVOS_TICS_OF_USEC(_v) (_v)
 
-#define ActuatorArdroneSet(_i, _v) { actuators_pwm_values[_i] = _v; }
-#define ActuatorsArdroneCommit() actuators_ardrone_commit();
-#define ActuatorsArdroneInit() actuators_ardrone_init();
-
 #define MOT_LEDOFF 0
 #define MOT_LEDRED 1
 #define MOT_LEDGREEN 2
 #define MOT_LEDORANGE 3
 
-uint16_t actuators_pwm_values[ACTUATORS_ARDRONE_NB];
-
-extern void actuators_ardrone_commit(void);
-extern void actuators_ardrone_init(void);
-
-
+bool actuators_ardrone_init(void);
+void actuators_ardrone_set_power(float mot1, float mot2, float mot3, float mot4);
 int actuators_ardrone_cmd(uint8_t cmd, uint8_t *reply, int replylen);
 void actuators_ardrone_set_pwm(uint16_t pwm0, uint16_t pwm1, uint16_t pwm2, uint16_t pwm3);
 void actuators_ardrone_set_leds(uint8_t led0, uint8_t led1, uint8_t led2, uint8_t led3);
+void actuators_stop(void);
 void actuators_ardrone_close(void);
 
 

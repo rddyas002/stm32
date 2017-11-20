@@ -8,6 +8,7 @@ static bool navdata_available = false;
 /* syncronization variables */
 static pthread_mutex_t navdata_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t  navdata_cond  = PTHREAD_COND_INITIALIZER;
+pthread_t navdata_thread;
 
 ssize_t full_write(int fd, const uint8_t *buf, size_t count)
 {
@@ -72,13 +73,6 @@ static void *navdata_read(void *data __attribute__((unused)))
 		pthread_mutex_lock(&navdata_mutex);
 		while (navdata_available) {
 			navdata_available = false;
-
-		printf("%7d,%7d,%7d|%7d,%7d,%7d|%7d,%7d,%7d|%u|%u,%u\n",
-				navdata.measure.vx, navdata.measure.vy, navdata.measure.vz,
-				navdata.measure.ax, navdata.measure.ay, navdata.measure.az,
-				navdata.measure.mx, navdata.measure.my, navdata.measure.mz,
-				navdata.measure.ultrasound, navdata.measure.temperature_gyro, navdata.measure.temperature_acc);
-
 			pthread_cond_wait(&navdata_cond, &navdata_mutex);
 		}
 		pthread_mutex_unlock(&navdata_mutex);
@@ -193,7 +187,6 @@ bool navdata_init(void){
 	gpio_set(ARDRONE_GPIO_PORT, ARDRONE_GPIO_PIN_NAVDATA);
 
 	/* Start navdata reading thread */
-	pthread_t navdata_thread;
 	if (pthread_create(&navdata_thread, NULL, navdata_read, NULL) != 0) {
 		printf("[navdata] Could not create navdata reading thread!\n");
 		return false;

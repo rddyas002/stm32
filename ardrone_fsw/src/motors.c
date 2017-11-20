@@ -35,7 +35,7 @@
 #include "mcu_periph/gpio.h"
 #include "led_hw.h"
 #include "mcu_periph/sys_time.h"
-*/
+ */
 #include "navdata.h" // for full_write
 
 #include <stdio.h>   /* Standard input/output definitions */
@@ -45,6 +45,17 @@
 #include <errno.h>   /* Error number definitions */
 #include <termios.h> /* POSIX terminal control definitions */
 #include <stdint.h>
+
+typedef struct {
+	float power[4]; //motor speed setting. 0.0=min power, 1.0=full power
+	uint16_t pwm[4];   //motor speed 0x00-0x1ff.  -- protected by mutex
+	uint8_t led[4];   //led 0=off 1=red 2=green 3=orange -- protected by mutex
+	uint8_t NeedToSendLedCmd;
+}motor_t;
+
+pthread_t mot_thread;
+pthread_mutex_t mot_mutex;
+motor_t motor;
 
 /**
  * Power consumption @ 11V all 4 motors running
@@ -57,6 +68,9 @@
  * 130  3.0
  */
 int actuator_ardrone2_fd; /**< File descriptor for the port */
+
+const uint16_t mot_pwm_min = 0x00;
+const uint16_t mot_pwm_max = 0x1ff;
 
 #define ARDRONE_GPIO_PORT       0x32524
 
@@ -74,22 +88,41 @@ static inline void actuators_ardrone_reset_flipflop(void)
 {
 	gpio_setup_output(ARDRONE_GPIO_PORT, ARDRONE_GPIO_PIN_IRQ_FLIPFLOP);
 	gpio_clear(ARDRONE_GPIO_PORT, ARDRONE_GPIO_PIN_IRQ_FLIPFLOP);
-//	int32_t stop = sys_time.nb_sec + 2;
-//	while (sys_time.nb_sec < stop);
+	sleep(2);
+	//	int32_t stop = sys_time.nb_sec + 2;
+	//	while (sys_time.nb_sec < stop);
 	gpio_set(ARDRONE_GPIO_PORT, ARDRONE_GPIO_PIN_IRQ_FLIPFLOP);
 }
 
-
-
-void actuators_ardrone_init(void)
+static void *motor_update(void *data __attribute__((unused)))
 {
+	printf("Motor control thread started!\r\n");
+	while(1) {
+		//5000us = 200Hz update interval
+		usleep(5000);
+
+		pthread_mutex_lock(&mot_mutex);
+		actuators_ardrone_set_pwm(motor.pwm[0], motor.pwm[1], motor.pwm[2],	motor.pwm[3]);
+		pthread_mutex_unlock(&mot_mutex);
+	}
+	return NULL;
+}
+
+bool actuators_ardrone_init(void)
+{
+	int i;
 	led_hw_values = 0;
+	for (i = 0; i < 4; i++){
+		motor.pwm[i] = 0;
+		motor.led[i] = 0;
+		motor.power[i] = 0.0f;
+	}
 
 	//open mot port
 	actuator_ardrone2_fd = open("/dev/ttyO0", O_RDWR | O_NOCTTY | O_NDELAY);
 	if (actuator_ardrone2_fd == -1) {
 		perror("open_port: Unable to open /dev/ttyO0 - ");
-		return;
+		return false;
 	}
 	fcntl(actuator_ardrone2_fd, F_SETFL, 0); //read calls are non blocking
 	fcntl(actuator_ardrone2_fd, F_GETFL, 0);
@@ -113,7 +146,6 @@ void actuators_ardrone_init(void)
 	//reset IRQ flipflop - on error 106 read 1, this code resets 106 to 0
 	gpio_setup_input(ARDRONE_GPIO_PORT, ARDRONE_GPIO_PIN_IRQ_INPUT);
 	actuators_ardrone_reset_flipflop();
-
 
 	//all select lines active
 	gpio_setup_output(ARDRONE_GPIO_PORT, ARDRONE_GPIO_PIN_MOTOR1);
@@ -156,7 +188,17 @@ void actuators_ardrone_init(void)
 	gpio_set(ARDRONE_GPIO_PORT, ARDRONE_GPIO_PIN_IRQ_FLIPFLOP);
 
 	// Left Red, Right Green
-	actuators_ardrone_set_leds(MOT_LEDRED, MOT_LEDGREEN, MOT_LEDGREEN, MOT_LEDRED);
+	actuators_ardrone_set_leds(MOT_LEDGREEN, MOT_LEDGREEN, MOT_LEDGREEN, MOT_LEDGREEN);
+
+	pthread_mutex_init(&mot_mutex, NULL);
+	//start mot thread
+	int rc = pthread_create(&mot_thread, NULL, motor_update, NULL);
+	if (rc) {
+		printf("[motor]: Return code from pthread_create(mot_thread) is %d\n", rc);
+		return false;
+	}
+
+	return true;
 }
 
 int actuators_ardrone_cmd(uint8_t cmd, uint8_t *reply, int replylen)
@@ -205,7 +247,7 @@ void actuators_ardrone_motor_status(void)
 	last_motor_on = autopilot_get_motors_on();
 
 }
-*/
+ */
 
 #define BIT_NUMBER(VAL,BIT) (((VAL)>>BIT)&0x03)
 
@@ -220,11 +262,40 @@ void actuators_ardrone_led_run(void)
 	}
 }
 
-void actuators_ardrone_commit(void)
-{
-	actuators_ardrone_set_pwm(actuators_pwm_values[0], actuators_pwm_values[1], actuators_pwm_values[2],
-			actuators_pwm_values[3]);
-//	RunOnceEvery(100, actuators_ardrone_motor_status());
+void actuators_ardrone_set_power(float mot1, float mot2, float mot3, float mot4){
+	float pwm[4];
+	int i;
+
+	pthread_mutex_lock(&mot_mutex);
+	motor.power[0] = mot1;
+	motor.power[1] = mot2;
+	motor.power[2] = mot3;
+	motor.power[3] = mot4;
+
+	for(i = 0; i < 4; i++) {
+		if(motor.power[i] < 0.0) motor.power[i] = 0.0;
+		if(motor.power[i] > 1.0) motor.power[i] = 1.0;
+		pwm[i] = mot_pwm_min + motor.power[i]*(mot_pwm_max-mot_pwm_min);
+		if(pwm[i] < mot_pwm_min) pwm[i] = mot_pwm_min;
+		if(pwm[i] > mot_pwm_max) pwm[i] = mot_pwm_max;
+	}
+	pthread_mutex_unlock(&mot_mutex);
+}
+
+void actuators_stop(void){
+	pthread_mutex_lock(&mot_mutex);
+	motor.power[0] = 0.0;
+	motor.power[1] = 0.0;
+	motor.power[2] = 0.0;
+	motor.power[3] = 0.0;
+	int i;
+	for(i = 0; i < 4; i++) {
+		if(motor.power[i] < 0.0) motor.power[i] = 0.0;
+		if(motor.power[i] > 1.0) motor.power[i] = 1.0;
+		motor.pwm[i] = 0;
+	}
+	actuators_ardrone_set_pwm(motor.pwm[0], motor.pwm[1], motor.pwm[2],	motor.pwm[3]);
+	pthread_mutex_unlock(&mot_mutex);
 }
 
 /**
@@ -240,7 +311,6 @@ void actuators_ardrone_set_pwm(uint16_t pwm0, uint16_t pwm1, uint16_t pwm2, uint
 	cmd[3] = ((pwm2 & 0x1ff) << 2) | ((pwm3 & 0x1ff) >> 7);
 	cmd[4] = ((pwm3 & 0x1ff) << 1);
 	full_write(actuator_ardrone2_fd, cmd, 5);
-//	RunOnceEvery(20, actuators_ardrone_led_run());
 }
 
 /**
