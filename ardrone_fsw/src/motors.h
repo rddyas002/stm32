@@ -27,6 +27,7 @@ void actuators_ardrone_set_power(float mot1, float mot2, float mot3, float mot4)
 int actuators_ardrone_cmd(uint8_t cmd, uint8_t *reply, int replylen);
 void actuators_ardrone_set_pwm(uint16_t pwm0, uint16_t pwm1, uint16_t pwm2, uint16_t pwm3);
 void actuators_ardrone_set_leds(uint8_t led0, uint8_t led1, uint8_t led2, uint8_t led3);
+void actuators_ardrone_commit_color(uint8_t LED1, uint8_t LED2, uint8_t LED3, uint8_t LED4);
 void actuators_stop(void);
 void actuators_ardrone_close(void);
 
