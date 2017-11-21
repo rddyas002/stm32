@@ -29,19 +29,15 @@ int main(void) {
 	signal(SIGINT, intHandler);
 	double t0 = timeNow_us();
 
-	//if (!navdata_init()) exit(1);
-	if(!actuators_ardrone_init()) exit(1);
-	if(!spektrum_init()) exit(1);
+	if (!navdata_init()) exit(1);
+	//if(!actuators_ardrone_init()) exit(1);
+	//if(!spektrum_init()) exit(1);
 
 	while(keepRunning){
 		usleep(20000);
-		actuators_ardrone_set_power(getThrottle(), 0, 0, 0);
-		/*
-		actuators_ardrone_set_power(0.02, 0, 0, 0);
-		sleep(3);
-		actuators_ardrone_set_power(0.03, 0, 0, 0);
-		sleep(3);
-		*/
+		//actuators_ardrone_set_power(getThrottle(), 0, 0, 0);
+
+
 /*
 		actuators_ardrone_set_pwm(20, 0, 0, 0);
 		usleep(100000);
@@ -57,19 +53,17 @@ int main(void) {
 		actuators_stop();
 		sleep(1);
 */
-
 /*
- 	 * navdata_update();
- * 		printf("%7d,%7d,%7d|%7d,%7d,%7d|%7d,%7d,%7d|%u|%u,%u\n",
+		printf("%7d,%7d,%7d,%7d,%7d,%7d,%7d,%7d,%7d,%7u,%7u,%7u\n",
 				navdata.measure.vx, navdata.measure.vy, navdata.measure.vz,
 				navdata.measure.ax, navdata.measure.ay, navdata.measure.az,
 				navdata.measure.mx, navdata.measure.my, navdata.measure.mz,
 				navdata.measure.ultrasound, navdata.measure.temperature_gyro, navdata.measure.temperature_acc);
 				*/
 	}
-	actuators_ardrone_close();
-	//close_navdata();
-	close_spektrum();
+	//actuators_ardrone_close();
+	close_navdata();
+	//close_spektrum();
 	printf("Terminated cleanly.\r\n");
 	return EXIT_SUCCESS;
 }

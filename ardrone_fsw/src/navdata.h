@@ -149,8 +149,6 @@ extern struct navdata_t navdata;
 
 bool navdata_init(void);
 void close_navdata(void);
-void navdata_update(void);
-int16_t navdata_height(void);
 
 /* FIXME: This should be moved to the uart handling part! */
 ssize_t full_write(int fd, const uint8_t *buf, size_t count);

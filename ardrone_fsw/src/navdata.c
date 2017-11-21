@@ -1,5 +1,6 @@
 #include "navdata.h"
 #include "gpio.h"
+#include "timing.h"
 
 /** Sonar offset.
  *  Offset value in ADC
@@ -19,7 +20,7 @@
 
 struct navdata_t navdata;
 static uint8_t navdata_buffer[NAVDATA_PACKET_SIZE];
-static bool navdata_available = false;
+volatile static bool navdata_available = false;
 volatile static bool navdata_bytes_available = false;
 
 /* syncronization variables */
@@ -28,12 +29,12 @@ static pthread_cond_t  navdata_cond  = PTHREAD_COND_INITIALIZER;
 pthread_t navdata_thread;
 
 #ifdef NAVDATA_LOGGING
-	FILE *navdata_file_p;
+FILE *navdata_file_p;
 #endif
 
 void signal_handler_navdata (int status){
 	ioctl(navdata.fd, FIONREAD, &navdata_bytes_available);
-	if (navdata_bytes_available > 60)
+	if (navdata_bytes_available >= 60)
 		pthread_cond_signal(&navdata_cond);
 }
 
@@ -88,11 +89,7 @@ static void navdata_cmd_send(uint8_t cmd)
  * Main reading thread
  * This is done asynchronous because the navdata board doesn't support NON_BLOCKING
  */
-static void *navdata_read(void *data __attribute__((unused)))
-{
-	/* Buffer insert index for reading/writing */
-	static uint8_t buffer_idx = 0;
-
+static void *navdata_read(void *data __attribute__((unused))){
 	printf("[navdata] Read thread started!\n");
 
 	while (true) {
@@ -101,85 +98,8 @@ static void *navdata_read(void *data __attribute__((unused)))
 		pthread_mutex_unlock(&navdata_mutex);
 		// 60 bytes are available
 		int newbytes = read(navdata.fd, &navdata_buffer[0], NAVDATA_PACKET_SIZE);
-/*		int i;
-		for (i = 0; i < newbytes; i++)
-			printf("0x%.2X ",navdata_buffer[i]);
-		printf("\r\n\r\n");
-*/
-		if (navdata_buffer[0] == NAVDATA_START_BYTE){
-			if (navdata_buffer[1] == NAVDATA_SECOND_BYTE){
-				// full packet read with startbyte at the beginning, reset insert index
-				buffer_idx = 0;
 
-				// Calculate the checksum
-				uint16_t checksum = 0;
-				int i;
-				for (i = 2; i < NAVDATA_PACKET_SIZE - 2; i += 2) {
-					checksum += navdata_buffer[i] + (navdata_buffer[i + 1] << 8);
-				}
-
-				struct navdata_measure_t *new_measurement = (struct navdata_measure_t *)navdata_buffer;
-				float sonar_meas = 0;
-			    if (navdata.measure.ultrasound >> 15) {
-			      sonar_meas = (float)((navdata.measure.ultrasound & 0x7FFF) - SONAR_OFFSET) * SONAR_SCALE;
-			    }
-				if (checksum == new_measurement->chksum){
-#ifdef NAVDATA_LOGGING
-					fprintf(navdata_file_p, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%u\n",
-							new_measurement->vx, new_measurement->vy, new_measurement->vz,
-							new_measurement->ax, new_measurement->ay, new_measurement->az,
-							new_measurement->mx, new_measurement->my, new_measurement->mz,
-							new_measurement->ultrasound);
-#else
-					printf("%7d%7d%7d%7d%7d%7d%7d%7d%7d%7u\n",
-							new_measurement->vx, new_measurement->vy, new_measurement->vz,
-							new_measurement->ax, new_measurement->ay, new_measurement->az,
-							new_measurement->mx, new_measurement->my, new_measurement->mz,
-							new_measurement->ultrasound);
-#endif
-				}
-			}
-		}
-
-/*
-		// Wait until we are notified to read next data, i.e. buffer has been copied in navdata_update
-		pthread_mutex_lock(&navdata_mutex);
-		while (navdata_available) {
-			navdata_available = false;
-			pthread_cond_wait(&navdata_cond, &navdata_mutex);
-		}
-		pthread_mutex_unlock(&navdata_mutex);
-
-		// Read new bytes
-		int newbytes = read(navdata.fd, &navdata_buffer[0] + buffer_idx, NAVDATA_PACKET_SIZE - buffer_idx);
-
-
-		// When there was no signal interrupt
-		if (newbytes > 0) {
-			buffer_idx += newbytes;
-			navdata.totalBytesRead += newbytes;
-		}
-
-		// If we got a full packet
-		if (buffer_idx >= NAVDATA_PACKET_SIZE) {
-			// check if the start byte is correct
-			if (navdata_buffer[0] != NAVDATA_START_BYTE) {
-				uint8_t *pint = memchr(navdata_buffer, NAVDATA_START_BYTE, buffer_idx);
-
-				// Check if we found the start byte in the read data
-				if (pint != NULL) {
-					memmove(navdata_buffer, pint, NAVDATA_PACKET_SIZE - (pint - navdata_buffer));
-					buffer_idx = pint - navdata_buffer;
-					fprintf(stderr, "[navdata] sync error, startbyte not found, resetting...\n");
-				} else {
-					buffer_idx = 0;
-				}
-				continue;
-			}
-
-			// full packet read with startbyte at the beginning, reset insert index
-			buffer_idx = 0;
-
+		if ((navdata_buffer[0] == NAVDATA_START_BYTE) && (navdata_buffer[1] == NAVDATA_SECOND_BYTE)){
 			// Calculate the checksum
 			uint16_t checksum = 0;
 			int i;
@@ -188,22 +108,25 @@ static void *navdata_read(void *data __attribute__((unused)))
 			}
 
 			struct navdata_measure_t *new_measurement = (struct navdata_measure_t *)navdata_buffer;
-
-			// Check if the checksum is OK
-			if (new_measurement->chksum != checksum) {
-				fprintf(stderr, "[navdata] Checksum error [calculated: %d] [packet: %d] [diff: %d]\n",
-						checksum, new_measurement->chksum, checksum - new_measurement->chksum);
-				navdata.checksum_errors++;
-
-				continue;
+			if (checksum == new_measurement->chksum){
+#ifdef NAVDATA_LOGGING
+				fprintf(navdata_file_p, "%.0f,%d,%d,%d,%d,%d,%d,%d,%d,%d,%u,%u,%u\n",
+						timeNow_us(),
+						new_measurement->vx, new_measurement->vy, new_measurement->vz,
+						new_measurement->ax, new_measurement->ay, new_measurement->az,
+						new_measurement->mx, new_measurement->my, new_measurement->mz,
+						new_measurement->ultrasound,new_measurement->temperature_acc,new_measurement->temperature_gyro);
+#endif
+				pthread_mutex_lock(&navdata_mutex);
+				memcpy(&navdata.measure, new_measurement, sizeof(struct navdata_measure_t));
+				navdata_available = true;
+				pthread_mutex_unlock(&navdata_mutex);
 			}
-
-			// Set flag that we have new valid navdata
-			pthread_mutex_lock(&navdata_mutex);
-			navdata_available = true;
-			pthread_mutex_unlock(&navdata_mutex);
 		}
-		*/
+		else{
+			// Flush input buffer until syncd
+			tcflush(navdata.fd, TCIFLUSH);
+		}
 	}
 
 	return NULL;
@@ -234,7 +157,7 @@ bool navdata_init(void){
 		fcntl(navdata.fd, F_SETFL, FASYNC);
 
 		/* Update the settings of the UART connection */
-	//	fcntl(navdata.fd, F_SETFL, 0); /* read calls are non blocking */
+		//	fcntl(navdata.fd, F_SETFL, 0); /* read calls are non blocking */
 		/* set port options */
 		struct termios options;
 		/* Get the current options for the port */
@@ -283,8 +206,8 @@ bool navdata_init(void){
 	// open file for logging
 	navdata_file_p = fopen(NAVDATA_LOGFILE, "w");
 	if (navdata_file_p == NULL) {
-	  fprintf(stderr, "[navdata]Can't open output file!\n");
-	  return false;
+		fprintf(stderr, "[navdata]Can't open output file!\n");
+		return false;
 	}
 #endif
 
@@ -298,49 +221,4 @@ void close_navdata(void){
 	if (navdata_file_p != NULL)
 		close(navdata_file_p);
 #endif
-}
-
-/**
- * Update the navdata (event loop)
- */
-void navdata_update()
-{
-	pthread_mutex_lock(&navdata_mutex);
-	/* If we got a new navdata packet */
-	if (navdata_available) {
-
-		/* Copy the navdata packet */
-		memcpy(&navdata.measure, navdata_buffer, NAVDATA_PACKET_SIZE);
-
-		/* reset the flag */
-		navdata_available = false;
-		/* signal that we copied the buffer and new packet can be read */
-		pthread_cond_signal(&navdata_cond);
-		pthread_mutex_unlock(&navdata_mutex);
-
-		/* Check if we missed a packet (our counter and the one from the navdata) */
-		navdata.last_packet_number++;
-		if (navdata.last_packet_number != navdata.measure.nu_trame) {
-			fprintf(stderr, "[navdata] Lost frame: %d should have been %d\n",
-					navdata.measure.nu_trame, navdata.last_packet_number);
-			navdata.lost_imu_frames++;
-		}
-		navdata.last_packet_number = navdata.measure.nu_trame;
-
-	    /* Invert byte order so that TELEMETRY works better */
-	    uint8_t tmp;
-	    uint8_t *p = (uint8_t *) & (navdata.measure.pressure);
-	    tmp = p[0];
-	    p[0] = p[1];
-	    p[1] = tmp;
-	    p = (uint8_t *) & (navdata.measure.temperature_pressure);
-	    tmp = p[0];
-	    p[0] = p[1];
-	    p[1] = tmp;
-
-		navdata.packetsRead++;
-	} else {
-		/* no new packet available, still unlock mutex again */
-		pthread_mutex_unlock(&navdata_mutex);
-	}
 }

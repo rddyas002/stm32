@@ -85,6 +85,9 @@ const uint16_t mot_pwm_max = 0x1ff;
 #define ARDRONE_GPIO_PIN_IRQ_INPUT    176
 
 uint32_t led_hw_values;
+volatile bool motors_armed = false;
+
+void actuators_ardrone_motor_status(void);
 
 static inline void actuators_ardrone_reset_flipflop(void)
 {
@@ -99,16 +102,25 @@ static inline void actuators_ardrone_reset_flipflop(void)
 static void *motor_update(void *data __attribute__((unused)))
 {
 	double t0 = timeNow_us();
+	int8_t check_status = 100;
 	printf("Motor control thread started!\r\n");
+	motors_armed = true;
 	while(1) {
-		//5000us = 200Hz update interval
+		// 200Hz update interval
 		usleep(5000);
 
 		pthread_mutex_lock(&mot_mutex);
 		actuators_ardrone_set_pwm(motor.pwm[0], motor.pwm[1], motor.pwm[2],	motor.pwm[3]);
 		actuators_ardrone_set_leds(motor.led[0], motor.led[1], motor.led[2], motor.led[3]);
 		pthread_mutex_unlock(&mot_mutex);
+
+		// check motor status every 100th sample (2Hz)
+		if (check_status-- <= 0){
+			actuators_ardrone_motor_status();
+			check_status = 10;
+		}
 	}
+	motors_armed = false;
 	return NULL;
 }
 
@@ -201,7 +213,6 @@ bool actuators_ardrone_init(void)
 		printf("[motor]: Return code from pthread_create(mot_thread) is %d\n", rc);
 		return false;
 	}
-
 	return true;
 }
 
@@ -214,13 +225,12 @@ int actuators_ardrone_cmd(uint8_t cmd, uint8_t *reply, int replylen)
 	return full_read(actuator_ardrone2_fd, reply, replylen);
 }
 
-/*
+
 void actuators_ardrone_motor_status(void)
 {
-	static bool last_motor_on = false;
-
 	// Reset Flipflop sequence
 	static uint8_t reset_flipflop_counter = 0;
+
 	if (reset_flipflop_counter > 0) {
 		reset_flipflop_counter--;
 
@@ -237,21 +247,12 @@ void actuators_ardrone_motor_status(void)
 
 	// If a motor IRQ line is set
 	if (gpio_get(ARDRONE_GPIO_PORT, ARDRONE_GPIO_PIN_IRQ_INPUT) == 1) {
-		if (autopilot_get_motors_on()) {
-			if (last_motor_on) {
-				// Tell paparazzi that one motor has stalled
-				autopilot_set_motors_on(FALSE);
-			} else {
-				// Toggle Flipflop reset so motors can be re-enabled
-				reset_flipflop_counter = 20;
-			}
-
+		if (motors_armed) {
+			reset_flipflop_counter = 20;
 		}
 	}
-	last_motor_on = autopilot_get_motors_on();
-
 }
- */
+
 
 #define BIT_NUMBER(VAL,BIT) (((VAL)>>BIT)&0x03)
 
