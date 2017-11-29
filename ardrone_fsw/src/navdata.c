@@ -29,7 +29,6 @@ volatile uint32_t average_counter = 0;
 volatile double gyro_rate_bias[3] = {0};
 volatile double accel_bias[3] = {0};
 volatile double mag_bias[3] = {0};
-volatile int16_t gyro_offset[3] = {0};
 volatile bool ekf_initialised = false;
 double nav_start_time = 0;
 imu_data_s imu_data;
@@ -189,9 +188,9 @@ static void *navdata_read(void *data __attribute__((unused))){
 				pthread_mutex_lock(&navdata_mutex);
 				memcpy(&navdata.measure, new_measurement, sizeof(struct navdata_measure_t));
 				// scale measurments
-				imu_data.rate[0] = (float)((navdata.measure.vx - gyro_offset[0])*IMU_GYRO_P_SIGN) / IMU_GYRO_SENS;
-				imu_data.rate[1] = (float)((navdata.measure.vy - gyro_offset[1])*IMU_GYRO_Q_SIGN) / IMU_GYRO_SENS;
-				imu_data.rate[2] = (float)((navdata.measure.vz - gyro_offset[2])*IMU_GYRO_R_SIGN) / IMU_GYRO_SENS;
+				imu_data.rate[0] = (float)((navdata.measure.vx)*IMU_GYRO_P_SIGN) / IMU_GYRO_SENS;
+				imu_data.rate[1] = (float)((navdata.measure.vy)*IMU_GYRO_Q_SIGN) / IMU_GYRO_SENS;
+				imu_data.rate[2] = (float)((navdata.measure.vz)*IMU_GYRO_R_SIGN) / IMU_GYRO_SENS;
 				imu_data.rate[0] *= M_PI_f/180.0f;
 				imu_data.rate[1] *= M_PI_f/180.0f;
 				imu_data.rate[2] *= M_PI_f/180.0f;
@@ -218,9 +217,9 @@ static void *navdata_read(void *data __attribute__((unused))){
 
 				if (nav_initialisation){
 					average_counter++;
-					gyro_rate_bias[0] += (double)navdata.measure.vx;
-					gyro_rate_bias[1] += (double)navdata.measure.vy;
-					gyro_rate_bias[2] += (double)navdata.measure.vz;
+					gyro_rate_bias[0] += (double)imu_data.rate[0];
+					gyro_rate_bias[1] += (double)imu_data.rate[1];
+					gyro_rate_bias[2] += (double)imu_data.rate[2];
 					accel_bias[0] += (double)imu_data.acceleration[0];
 					accel_bias[1] += (double)imu_data.acceleration[1];
 					accel_bias[2] += (double)imu_data.acceleration[2];
@@ -355,22 +354,16 @@ bool navdata_init(void){
 	pthread_mutex_lock(&navdata_mutex);
 	nav_initialisation = false;
 	pthread_mutex_unlock(&navdata_mutex);
-	gyro_offset[0] = (int16_t)floor(gyro_rate_bias[0]/average_counter + 0.5);
-	gyro_offset[1] = (int16_t)floor(gyro_rate_bias[1]/average_counter + 0.5);
-	gyro_offset[2] = (int16_t)floor(gyro_rate_bias[2]/average_counter + 0.5);
-	imu_data.gyro_offset[0] = (float)(gyro_offset[0]*IMU_GYRO_P_SIGN) / IMU_GYRO_SENS;
-	imu_data.gyro_offset[0] *= M_PI_f/180.0f;
-	imu_data.gyro_offset[1] = (float)(gyro_offset[1]*IMU_GYRO_Q_SIGN) / IMU_GYRO_SENS;
-	imu_data.gyro_offset[1] *= M_PI_f/180.0f;
-	imu_data.gyro_offset[2] = (float)(gyro_offset[2]*IMU_GYRO_R_SIGN) / IMU_GYRO_SENS;
-	imu_data.gyro_offset[2] *= M_PI_f/180.0f;
+	imu_data.gyro_offset[0] = (float)(gyro_rate_bias[0])/average_counter;
+	imu_data.gyro_offset[1] = (float)(gyro_rate_bias[1])/average_counter;
+	imu_data.gyro_offset[2] = (float)(gyro_rate_bias[2])/average_counter;
 	imu_data.accel_offset[0] = (float)accel_bias[0]/average_counter;
 	imu_data.accel_offset[1] = (float)accel_bias[1]/average_counter;
 	imu_data.accel_offset[2] = (float)accel_bias[2]/average_counter;
 	imu_data.mag_offset[0] = (float)mag_bias[0]/average_counter;
 	imu_data.mag_offset[1] = (float)mag_bias[1]/average_counter;
 	imu_data.mag_offset[2] = (float)mag_bias[2]/average_counter;
-	printf("[NAVDATA] Gyro average: %.2f,%.2f,%.2f\n", imu_data.gyro_offset[0], imu_data.gyro_offset[1], imu_data.gyro_offset[2]);
+	printf("[NAVDATA] Gyro average: %.2f,%.2f,%.2f\n", imu_data.gyro_offset[0]*180.0f/M_PI_f, imu_data.gyro_offset[1]*180.0f/M_PI_f, imu_data.gyro_offset[2]*180.0f/M_PI_f);
 	printf("[NAVDATA] Gyro variance: %f,%f,%f\n", imu_data.gyro_var[0], imu_data.gyro_var[1], imu_data.gyro_var[2]);
 	printf("[NAVDATA] Accel average: %.2f,%.2f,%.2f\n", imu_data.accel_offset[0], imu_data.accel_offset[1], imu_data.accel_offset[2]);
 	printf("[NAVDATA] Accel variance: %f,%f,%f\n", imu_data.accel_var[0], imu_data.accel_var[1], imu_data.accel_var[2]);
