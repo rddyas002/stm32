@@ -6,13 +6,18 @@
 #define IMU_GYRO_Q_SIGN   -1
 #define IMU_GYRO_R_SIGN   -1
 
-/** default accel sensitivy from the datasheet
- * 512 LSB/g
- */
 #define IMU_ACCEL_SENS	512
-#define IMU_ACCEL_X_SIGN   -1
-#define IMU_ACCEL_Y_SIGN   1
-#define IMU_ACCEL_Z_SIGN   1
+#define IMU_ACCEL_X_SIGN   1
+#define IMU_ACCEL_Y_SIGN   -1
+#define IMU_ACCEL_Z_SIGN   -1
+
+//#define IMU_ACCEL_SENS	512
+#define IMU_MAG_X_SIGN   -1
+#define IMU_MAG_Y_SIGN   -1
+#define IMU_MAG_Z_SIGN   -1
+#define IMU_MAG_X_OFFSET -57
+#define IMU_MAG_Y_OFFSET 15
+#define IMU_MAG_Z_OFFSET 314
 
 #if !defined IMU_ACCEL_X_NEUTRAL & !defined IMU_ACCEL_Y_NEUTRAL & !defined IMU_ACCEL_Z_NEUTRAL
 #define IMU_ACCEL_X_NEUTRAL 2048

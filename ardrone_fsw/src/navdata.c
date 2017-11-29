@@ -2,6 +2,7 @@
 #include "gpio.h"
 #include "timing.h"
 #include "imu_ardrone2.h"
+#include "ekf.h"
 
 /** Sonar offset.
  *  Offset value in ADC
@@ -26,9 +27,16 @@ volatile static bool navdata_bytes_available = false;
 volatile bool nav_initialisation = false;
 volatile uint32_t average_counter = 0;
 volatile double gyro_rate_bias[3] = {0};
+volatile double accel_bias[3] = {0};
+volatile double mag_bias[3] = {0};
 volatile int16_t gyro_offset[3] = {0};
+volatile bool ekf_initialised = false;
 double nav_start_time = 0;
 imu_data_s imu_data;
+float b_32[3] = {0};
+float q_32[4] = {0};
+float ypr_32[3] = {0};
+float delta_t_32 = 0;
 
 
 /* syncronization variables */
@@ -95,12 +103,70 @@ static void navdata_cmd_send(uint8_t cmd)
 	full_write(navdata.fd, &cmd, 1);
 }
 
+float computeMean(float m, float x, float k){
+	return m + (x - m)/k;
+}
+
+float computeVariance(float v, float x, float m, float m_k){
+	return v + (x - m)*(x - m_k);
+}
+
+void computeGyroStats(imu_data_s * imu_data){
+	static float m_g[3] = {0};
+	static float v_g[3] = {0};
+	static float m_a[3] = {0};
+	static float v_a[3] = {0};
+	static float m_m[3] = {0};
+	static float v_m[3] = {0};
+
+	static uint32_t count = 0;
+	static bool first_enter = true;
+	int i;
+
+	if (first_enter){
+		for (i = 0; i < 3; i++){
+			v_g[i] = 0.0f;
+			m_g[i] = imu_data->rate[i];
+			v_a[i] = 0.0f;
+			m_a[i] = imu_data->acceleration[i];
+			v_m[i] = 0.0f;
+			m_m[i] = imu_data->magnetic[i];
+		}
+
+		count++;
+		first_enter = false;
+		return;
+	}
+
+	float m_k;
+	for (i = 0; i < 3; i++){
+		m_k = computeMean(m_g[i], imu_data->rate[i], (float)count);
+		v_g[i] = computeVariance(v_g[i], imu_data->rate[i], m_g[i], m_k);
+		m_g[i] = m_k;
+
+		m_k = computeMean(m_a[i], imu_data->acceleration[i], (float)count);
+		v_a[i] = computeVariance(v_a[i], imu_data->acceleration[i], m_a[i], m_k);
+		m_a[i] = m_k;
+
+		m_k = computeMean(m_m[i], imu_data->magnetic[i], (float)count);
+		v_m[i] = computeVariance(v_m[i], imu_data->magnetic[i], m_m[i], m_k);
+		m_m[i] = m_k;
+
+		count++;
+		imu_data->gyro_var[i] = v_g[i]/((float)count - 1.0f);
+		imu_data->accel_var[i] = v_a[i]/((float)count - 1.0f);
+		imu_data->mag_var[i] = v_m[i]/((float)count - 1.0f);
+	}
+}
+
 
 /**
  * Main reading thread
  * This is done asynchronous because the navdata board doesn't support NON_BLOCKING
  */
 static void *navdata_read(void *data __attribute__((unused))){
+	double prev_time = 0;
+
 	printf("[navdata] Read thread started!\n");
 
 	while (true) {
@@ -120,31 +186,74 @@ static void *navdata_read(void *data __attribute__((unused))){
 
 			struct navdata_measure_t *new_measurement = (struct navdata_measure_t *)navdata_buffer;
 			if (checksum == new_measurement->chksum){
-#ifdef NAVDATA_LOGGING
-				fprintf(navdata_file_p, "%.0f,%d,%d,%d,%d,%d,%d,%d,%d,%d,%u,%u,%u\n",
-						timeNow_us(),
-						new_measurement->vx, new_measurement->vy, new_measurement->vz,
-						new_measurement->ax, new_measurement->ay, new_measurement->az,
-						new_measurement->mx, new_measurement->my, new_measurement->mz,
-						new_measurement->ultrasound,new_measurement->temperature_acc,new_measurement->temperature_gyro);
-#endif
 				pthread_mutex_lock(&navdata_mutex);
 				memcpy(&navdata.measure, new_measurement, sizeof(struct navdata_measure_t));
 				// scale measurments
 				imu_data.rate[0] = (float)((navdata.measure.vx - gyro_offset[0])*IMU_GYRO_P_SIGN) / IMU_GYRO_SENS;
 				imu_data.rate[1] = (float)((navdata.measure.vy - gyro_offset[1])*IMU_GYRO_Q_SIGN) / IMU_GYRO_SENS;
 				imu_data.rate[2] = (float)((navdata.measure.vz - gyro_offset[2])*IMU_GYRO_R_SIGN) / IMU_GYRO_SENS;
+				imu_data.rate[0] *= M_PI_f/180.0f;
+				imu_data.rate[1] *= M_PI_f/180.0f;
+				imu_data.rate[2] *= M_PI_f/180.0f;
 				imu_data.acceleration[0] = (float)(navdata.measure.ax - IMU_ACCEL_X_NEUTRAL)*IMU_ACCEL_X_SIGN / IMU_ACCEL_SENS;
 				imu_data.acceleration[1] = (float)(navdata.measure.ay - IMU_ACCEL_Y_NEUTRAL)*IMU_ACCEL_Y_SIGN / IMU_ACCEL_SENS;
 				imu_data.acceleration[2] = (float)(navdata.measure.az - IMU_ACCEL_Z_NEUTRAL)*IMU_ACCEL_Z_SIGN / IMU_ACCEL_SENS;
+				imu_data.magnetic[0] = (float)(navdata.measure.mx - IMU_MAG_X_OFFSET)*IMU_MAG_X_SIGN;
+				imu_data.magnetic[1] = (float)(navdata.measure.my - IMU_MAG_Y_OFFSET)*IMU_MAG_Y_SIGN;
+				imu_data.magnetic[2] = (float)(navdata.measure.mz - IMU_MAG_Z_OFFSET)*IMU_MAG_Z_SIGN;
+
+				// normalise mag and accel
+				float magnetic_norm = sqrt(imu_data.magnetic[0]*imu_data.magnetic[0] +
+						imu_data.magnetic[1]*imu_data.magnetic[1]+
+						imu_data.magnetic[2]*imu_data.magnetic[2]);
+				float accel_norm = sqrt(imu_data.acceleration[0]*imu_data.acceleration[0] +
+						imu_data.acceleration[1]*imu_data.acceleration[1]+
+						imu_data.acceleration[2]*imu_data.acceleration[2]);
+				imu_data.acceleration[0] /= accel_norm;
+				imu_data.acceleration[1] /= accel_norm;
+				imu_data.acceleration[2] /= accel_norm;
+				imu_data.magnetic[0] /= magnetic_norm;
+				imu_data.magnetic[1] /= magnetic_norm;
+				imu_data.magnetic[2] /= magnetic_norm;
 
 				if (nav_initialisation){
 					average_counter++;
 					gyro_rate_bias[0] += (double)navdata.measure.vx;
 					gyro_rate_bias[1] += (double)navdata.measure.vy;
 					gyro_rate_bias[2] += (double)navdata.measure.vz;
+					accel_bias[0] += (double)imu_data.acceleration[0];
+					accel_bias[1] += (double)imu_data.acceleration[1];
+					accel_bias[2] += (double)imu_data.acceleration[2];
+					mag_bias[0] += (double)imu_data.magnetic[0];
+					mag_bias[1] += (double)imu_data.magnetic[1];
+					mag_bias[2] += (double)imu_data.magnetic[2];
+					computeGyroStats(&imu_data);
 				}
+
+				double time_now = getNavTime();
+				if(ekf_initialised){
+					if (delta_t_32 == 0){
+						delta_t_32 = 5e-3;
+					}
+					else{
+						delta_t_32 = (float)(time_now - prev_time)/1e6;
+					}
+					prev_time = time_now;
+					run_ekf(delta_t_32, imu_data.rate, imu_data.acceleration, imu_data.magnetic, &q_32[0], &b_32[0]);
+					q2ypr(q_32, ypr_32);
+					printf("[%.0f]:%5.2f,%5.2f,%5.2f|%5.2f,%5.2f,%5.2f\r\n",time_now, ypr_32[0],ypr_32[1],ypr_32[2],b_32[0]*180.0f/M_PI_f,b_32[1]*180.0f/M_PI_f,b_32[2]*180.0f/M_PI_f);
+				}
+#ifdef PRINT_NAV_DEBUG
 				print_navdata();
+#endif
+#ifdef NAVDATA_LOGGING
+				fprintf(navdata_file_p,"%.0f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\n",
+						getNavTime(),
+						imu_data.rate[0],imu_data.rate[1],imu_data.rate[2],
+						imu_data.acceleration[0],imu_data.acceleration[1],imu_data.acceleration[2],
+						imu_data.magnetic[0],imu_data.magnetic[1],imu_data.magnetic[2]);
+#endif
+
 				navdata_available = true;
 				pthread_mutex_unlock(&navdata_mutex);
 			}
@@ -249,8 +358,28 @@ bool navdata_init(void){
 	gyro_offset[0] = (int16_t)floor(gyro_rate_bias[0]/average_counter + 0.5);
 	gyro_offset[1] = (int16_t)floor(gyro_rate_bias[1]/average_counter + 0.5);
 	gyro_offset[2] = (int16_t)floor(gyro_rate_bias[2]/average_counter + 0.5);
-	printf("[NAVDATA] Gyro offsets: %d,%d,%d\n", gyro_offset[0], gyro_offset[1], gyro_offset[2]);
-
+	imu_data.gyro_offset[0] = (float)(gyro_offset[0]*IMU_GYRO_P_SIGN) / IMU_GYRO_SENS;
+	imu_data.gyro_offset[0] *= M_PI_f/180.0f;
+	imu_data.gyro_offset[1] = (float)(gyro_offset[1]*IMU_GYRO_Q_SIGN) / IMU_GYRO_SENS;
+	imu_data.gyro_offset[1] *= M_PI_f/180.0f;
+	imu_data.gyro_offset[2] = (float)(gyro_offset[2]*IMU_GYRO_R_SIGN) / IMU_GYRO_SENS;
+	imu_data.gyro_offset[2] *= M_PI_f/180.0f;
+	imu_data.accel_offset[0] = (float)accel_bias[0]/average_counter;
+	imu_data.accel_offset[1] = (float)accel_bias[1]/average_counter;
+	imu_data.accel_offset[2] = (float)accel_bias[2]/average_counter;
+	imu_data.mag_offset[0] = (float)mag_bias[0]/average_counter;
+	imu_data.mag_offset[1] = (float)mag_bias[1]/average_counter;
+	imu_data.mag_offset[2] = (float)mag_bias[2]/average_counter;
+	printf("[NAVDATA] Gyro average: %.2f,%.2f,%.2f\n", imu_data.gyro_offset[0], imu_data.gyro_offset[1], imu_data.gyro_offset[2]);
+	printf("[NAVDATA] Gyro variance: %f,%f,%f\n", imu_data.gyro_var[0], imu_data.gyro_var[1], imu_data.gyro_var[2]);
+	printf("[NAVDATA] Accel average: %.2f,%.2f,%.2f\n", imu_data.accel_offset[0], imu_data.accel_offset[1], imu_data.accel_offset[2]);
+	printf("[NAVDATA] Accel variance: %f,%f,%f\n", imu_data.accel_var[0], imu_data.accel_var[1], imu_data.accel_var[2]);
+	printf("[NAVDATA] Mag average: %.2f,%.2f,%.2f\n", imu_data.mag_offset[0], imu_data.mag_offset[1], imu_data.mag_offset[2]);
+	printf("[NAVDATA] Mag variance: %f,%f,%f\n", imu_data.mag_var[0], imu_data.mag_var[1], imu_data.mag_var[2]);
+	init_ekf(&imu_data);
+	pthread_mutex_lock(&navdata_mutex);
+	ekf_initialised = true;
+	pthread_mutex_unlock(&navdata_mutex);
 	return true;
 }
 
@@ -259,10 +388,11 @@ double getNavTime(void){
 }
 
 void print_navdata(void){
-	printf("%.0f,%6.2f,%6.2f,%6.2f,%6.2f,%6.2f,%6.2f\n",
+	printf("%.0f,%6.2f,%6.2f,%6.2f,%6.2f,%6.2f,%6.2f,%6.2f,%6.2f,%6.2f\n",
 			getNavTime(),
 			imu_data.rate[0],imu_data.rate[1],imu_data.rate[2],
-			imu_data.acceleration[0],imu_data.acceleration[1],imu_data.acceleration[2]);/*,
+			imu_data.acceleration[0],imu_data.acceleration[1],imu_data.acceleration[2],
+			imu_data.magnetic[0],imu_data.magnetic[1],imu_data.magnetic[2]);/*,
 			navdata.measure.ax, navdata.measure.ay, navdata.measure.az,
 			navdata.measure.mx, navdata.measure.my, navdata.measure.mz,
 			navdata.measure.ultrasound,navdata.measure.temperature_acc,navdata.measure.temperature_gyro);

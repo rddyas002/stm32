@@ -47,21 +47,9 @@
 #include <pthread.h>
 #include <stdbool.h>
 
-typedef struct{
-	float rate[3];			// dps
-	float acceleration[3];	// g
-	float magnetic[3];		// uT
-	float gyro_var[3];
-	float accel_var[3];
-	float mag_var[3];
-	float gyro_offset[3];
-	float accel_offset[3];
-	float mag_offset[3];
-	float time;
-}__attribute__((packed)) imu_data_s;
-
 //#define NAVDATA_LOGGING
 #define NAVDATA_LOGFILE "navdata_log.csv"
+//#define PRINT_NAV_DEBUG
 
 /**
  * Main navdata structure from the navdata board
