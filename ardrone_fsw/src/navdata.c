@@ -1,6 +1,7 @@
 #include "navdata.h"
 #include "gpio.h"
 #include "timing.h"
+#include "imu_ardrone2.h"
 
 /** Sonar offset.
  *  Offset value in ADC
@@ -22,6 +23,13 @@ struct navdata_t navdata;
 static uint8_t navdata_buffer[NAVDATA_PACKET_SIZE];
 volatile static bool navdata_available = false;
 volatile static bool navdata_bytes_available = false;
+volatile bool nav_initialisation = false;
+volatile uint32_t average_counter = 0;
+volatile double gyro_rate_bias[3] = {0};
+volatile int16_t gyro_offset[3] = {0};
+double nav_start_time = 0;
+imu_data_s imu_data;
+
 
 /* syncronization variables */
 static pthread_mutex_t navdata_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -31,6 +39,9 @@ pthread_t navdata_thread;
 #ifdef NAVDATA_LOGGING
 FILE *navdata_file_p;
 #endif
+
+void print_navdata(void);
+double getNavTime(void);
 
 void signal_handler_navdata (int status){
 	ioctl(navdata.fd, FIONREAD, &navdata_bytes_available);
@@ -119,6 +130,21 @@ static void *navdata_read(void *data __attribute__((unused))){
 #endif
 				pthread_mutex_lock(&navdata_mutex);
 				memcpy(&navdata.measure, new_measurement, sizeof(struct navdata_measure_t));
+				// scale measurments
+				imu_data.rate[0] = (float)((navdata.measure.vx - gyro_offset[0])*IMU_GYRO_P_SIGN) / IMU_GYRO_SENS;
+				imu_data.rate[1] = (float)((navdata.measure.vy - gyro_offset[1])*IMU_GYRO_Q_SIGN) / IMU_GYRO_SENS;
+				imu_data.rate[2] = (float)((navdata.measure.vz - gyro_offset[2])*IMU_GYRO_R_SIGN) / IMU_GYRO_SENS;
+				imu_data.acceleration[0] = (float)(navdata.measure.ax - IMU_ACCEL_X_NEUTRAL)*IMU_ACCEL_X_SIGN / IMU_ACCEL_SENS;
+				imu_data.acceleration[1] = (float)(navdata.measure.ay - IMU_ACCEL_Y_NEUTRAL)*IMU_ACCEL_Y_SIGN / IMU_ACCEL_SENS;
+				imu_data.acceleration[2] = (float)(navdata.measure.az - IMU_ACCEL_Z_NEUTRAL)*IMU_ACCEL_Z_SIGN / IMU_ACCEL_SENS;
+
+				if (nav_initialisation){
+					average_counter++;
+					gyro_rate_bias[0] += (double)navdata.measure.vx;
+					gyro_rate_bias[1] += (double)navdata.measure.vy;
+					gyro_rate_bias[2] += (double)navdata.measure.vz;
+				}
+				print_navdata();
 				navdata_available = true;
 				pthread_mutex_unlock(&navdata_mutex);
 			}
@@ -135,6 +161,9 @@ static void *navdata_read(void *data __attribute__((unused))){
 
 bool navdata_init(void){
 	struct sigaction saio;
+
+	printf("Navdata init\n");
+	nav_start_time = timeNow_us();
 
 	/* Check if the FD isn't already initialized */
 	if (navdata.fd <= 0) {
@@ -196,6 +225,7 @@ bool navdata_init(void){
 	gpio_setup_output(ARDRONE_GPIO_PORT, ARDRONE_GPIO_PIN_NAVDATA);
 	gpio_set(ARDRONE_GPIO_PORT, ARDRONE_GPIO_PIN_NAVDATA);
 
+	nav_initialisation = true;
 	/* Start navdata reading thread */
 	if (pthread_create(&navdata_thread, NULL, navdata_read, NULL) != 0) {
 		printf("[navdata] Could not create navdata reading thread!\n");
@@ -211,7 +241,32 @@ bool navdata_init(void){
 	}
 #endif
 
+	// capture data for 2 seconds
+	while(getNavTime() < 2000000);
+	pthread_mutex_lock(&navdata_mutex);
+	nav_initialisation = false;
+	pthread_mutex_unlock(&navdata_mutex);
+	gyro_offset[0] = (int16_t)floor(gyro_rate_bias[0]/average_counter + 0.5);
+	gyro_offset[1] = (int16_t)floor(gyro_rate_bias[1]/average_counter + 0.5);
+	gyro_offset[2] = (int16_t)floor(gyro_rate_bias[2]/average_counter + 0.5);
+	printf("[NAVDATA] Gyro offsets: %d,%d,%d\n", gyro_offset[0], gyro_offset[1], gyro_offset[2]);
+
 	return true;
+}
+
+double getNavTime(void){
+	return timeNow_us() - nav_start_time;
+}
+
+void print_navdata(void){
+	printf("%.0f,%6.2f,%6.2f,%6.2f,%6.2f,%6.2f,%6.2f\n",
+			getNavTime(),
+			imu_data.rate[0],imu_data.rate[1],imu_data.rate[2],
+			imu_data.acceleration[0],imu_data.acceleration[1],imu_data.acceleration[2]);/*,
+			navdata.measure.ax, navdata.measure.ay, navdata.measure.az,
+			navdata.measure.mx, navdata.measure.my, navdata.measure.mz,
+			navdata.measure.ultrasound,navdata.measure.temperature_acc,navdata.measure.temperature_gyro);
+*/
 }
 
 void close_navdata(void){
