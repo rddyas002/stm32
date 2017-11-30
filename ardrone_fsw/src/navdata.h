@@ -150,6 +150,7 @@ extern struct navdata_t navdata;
 
 bool navdata_init(void);
 void close_navdata(void);
+void getEstimates(float * ypr, float *w_bias);
 
 /* FIXME: This should be moved to the uart handling part! */
 ssize_t full_write(int fd, const uint8_t *buf, size_t count);

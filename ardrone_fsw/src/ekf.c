@@ -61,27 +61,27 @@ void init_ekf(imu_data_s * imu_data){
 	}
 }
 
-void run_ekf(float Ts, float gyro[3], float accel[3], float magnetic[3], float * q, float * w){
+void run_ekf(imu_data_s * imu_data){
 	int i;
 	float y[6];
 	float gyro32[3];
 
 	for (i = 0; i < 3; i++){
-		y[i] = (float)accel[i];
-		y[i+3] = (float)magnetic[i];
-		gyro32[i] = (float)gyro[i];
+		y[i] = imu_data->acceleration[i];
+		y[i+3] = imu_data->magnetic[i];
+		gyro32[i] = imu_data->rate[i];
 	}
 
 	// propagate state
-	propagateState(x_f32_a, gyro32, Ts);
+	propagateState(x_f32_a, gyro32, imu_data->Ts);
 	// propagate covariance
-	propagateCovariance(P_f32_a, Ts, gyro32, Q_f32_a);
+	propagateCovariance(P_f32_a, imu_data->Ts, gyro32, Q_f32_a);
 	// update phase
 	updateStateAndCovariance(x_f32_a, P_f32_a, R_f32_a, y);
 
 	normalise32(&x_f32_a[0], 4);
-	memcpy(q, &x_f32_a[0], sizeof(float)*4);
-	memcpy(w, &x_f32_a[4], sizeof(float)*3);
+	memcpy(&imu_data->q[0], &x_f32_a[0], sizeof(float)*4);
+	memcpy(&imu_data->w_bias[0], &x_f32_a[4], sizeof(float)*3);
 }
 
 void propagateState(float x[7], float u[3], float Ts){

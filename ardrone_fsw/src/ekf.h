@@ -31,11 +31,16 @@ typedef struct{
 	float gyro_offset[3];
 	float accel_offset[3];
 	float mag_offset[3];
+	float q[4];
+	float w_bias[3];
+	float ypr[3];
+	float Ts;
 	float time;
+	bool initialised;
 }__attribute__((packed)) imu_data_s;
 
 void init_ekf(imu_data_s * imu_data);
-void run_ekf(float Ts, float gyro[3], float accel[3], float magnetic[3], float * q, float * w);
+void run_ekf(imu_data_s * imu_data);
 void q2ypr(float q[4], float ypr[3]);
 void triadComputation(float r1_wf[3], float r2_wf[3], float r1_bf[3], float r2_bf[3], float ypr[3]);
 

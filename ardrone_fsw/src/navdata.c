@@ -29,14 +29,11 @@ volatile uint32_t average_counter = 0;
 volatile double gyro_rate_bias[3] = {0};
 volatile double accel_bias[3] = {0};
 volatile double mag_bias[3] = {0};
-volatile bool ekf_initialised = false;
 double nav_start_time = 0;
 imu_data_s imu_data;
 float b_32[3] = {0};
 float q_32[4] = {0};
 float ypr_32[3] = {0};
-float delta_t_32 = 0;
-
 
 /* syncronization variables */
 static pthread_mutex_t navdata_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -49,6 +46,7 @@ FILE *navdata_file_p;
 
 void print_navdata(void);
 double getNavTime(void);
+float normalise3v(float v[3]);
 
 void signal_handler_navdata (int status){
 	ioctl(navdata.fd, FIONREAD, &navdata_bytes_available);
@@ -200,20 +198,12 @@ static void *navdata_read(void *data __attribute__((unused))){
 				imu_data.magnetic[0] = (float)(navdata.measure.mx - IMU_MAG_X_OFFSET)*IMU_MAG_X_SIGN;
 				imu_data.magnetic[1] = (float)(navdata.measure.my - IMU_MAG_Y_OFFSET)*IMU_MAG_Y_SIGN;
 				imu_data.magnetic[2] = (float)(navdata.measure.mz - IMU_MAG_Z_OFFSET)*IMU_MAG_Z_SIGN;
+				double time_now = getNavTime();
+				imu_data.time = (float) time_now;
 
 				// normalise mag and accel
-				float magnetic_norm = sqrt(imu_data.magnetic[0]*imu_data.magnetic[0] +
-						imu_data.magnetic[1]*imu_data.magnetic[1]+
-						imu_data.magnetic[2]*imu_data.magnetic[2]);
-				float accel_norm = sqrt(imu_data.acceleration[0]*imu_data.acceleration[0] +
-						imu_data.acceleration[1]*imu_data.acceleration[1]+
-						imu_data.acceleration[2]*imu_data.acceleration[2]);
-				imu_data.acceleration[0] /= accel_norm;
-				imu_data.acceleration[1] /= accel_norm;
-				imu_data.acceleration[2] /= accel_norm;
-				imu_data.magnetic[0] /= magnetic_norm;
-				imu_data.magnetic[1] /= magnetic_norm;
-				imu_data.magnetic[2] /= magnetic_norm;
+				float magnetic_norm = normalise3v(imu_data.magnetic);
+				float accel_norm = normalise3v(imu_data.acceleration);
 
 				if (nav_initialisation){
 					average_counter++;
@@ -229,18 +219,16 @@ static void *navdata_read(void *data __attribute__((unused))){
 					computeGyroStats(&imu_data);
 				}
 
-				double time_now = getNavTime();
-				if(ekf_initialised){
-					if (delta_t_32 == 0){
-						delta_t_32 = 5e-3;
+				if(imu_data.initialised){
+					if (imu_data.Ts == 0){
+						imu_data.Ts = 5e-3;
 					}
 					else{
-						delta_t_32 = (float)(time_now - prev_time)/1e6;
+						imu_data.Ts = (float)(time_now - prev_time)/1e6;
 					}
 					prev_time = time_now;
-					run_ekf(delta_t_32, imu_data.rate, imu_data.acceleration, imu_data.magnetic, &q_32[0], &b_32[0]);
-					q2ypr(q_32, ypr_32);
-					printf("[%.0f]:%5.2f,%5.2f,%5.2f|%5.2f,%5.2f,%5.2f\r\n",time_now, ypr_32[0],ypr_32[1],ypr_32[2],b_32[0]*180.0f/M_PI_f,b_32[1]*180.0f/M_PI_f,b_32[2]*180.0f/M_PI_f);
+					run_ekf(&imu_data);
+					q2ypr(imu_data.q, imu_data.ypr);
 				}
 #ifdef PRINT_NAV_DEBUG
 				print_navdata();
@@ -266,11 +254,18 @@ static void *navdata_read(void *data __attribute__((unused))){
 	return NULL;
 }
 
+void getEstimates(float * ypr, float *w_bias){
+	ypr = &imu_data.ypr[0];
+	w_bias = &imu_data.w_bias[0];
+}
+
 
 bool navdata_init(void){
 	struct sigaction saio;
 
 	printf("Navdata init\n");
+	imu_data.Ts = 0;
+	imu_data.initialised = false;
 	nav_start_time = timeNow_us();
 
 	/* Check if the FD isn't already initialized */
@@ -349,8 +344,9 @@ bool navdata_init(void){
 	}
 #endif
 
-	// capture data for 2 seconds
-	while(getNavTime() < 2000000);
+	// capture data for 3 seconds
+	printf("NAV data capturing data for mean estimation.\n");
+	while(getNavTime() < 3000000);
 	pthread_mutex_lock(&navdata_mutex);
 	nav_initialisation = false;
 	pthread_mutex_unlock(&navdata_mutex);
@@ -371,7 +367,7 @@ bool navdata_init(void){
 	printf("[NAVDATA] Mag variance: %f,%f,%f\n", imu_data.mag_var[0], imu_data.mag_var[1], imu_data.mag_var[2]);
 	init_ekf(&imu_data);
 	pthread_mutex_lock(&navdata_mutex);
-	ekf_initialised = true;
+	imu_data.initialised = true;
 	pthread_mutex_unlock(&navdata_mutex);
 	return true;
 }
@@ -380,16 +376,21 @@ double getNavTime(void){
 	return timeNow_us() - nav_start_time;
 }
 
+float normalise3v(float v[3]){
+	float norm = v[0]*v[0] + v[1]*v[1] + v[2]*v[2];
+	norm = sqrt(norm);
+	v[0] /= norm;
+	v[1] /= norm;
+	v[2] /= norm;
+	return norm;
+}
+
 void print_navdata(void){
 	printf("%.0f,%6.2f,%6.2f,%6.2f,%6.2f,%6.2f,%6.2f,%6.2f,%6.2f,%6.2f\n",
 			getNavTime(),
 			imu_data.rate[0],imu_data.rate[1],imu_data.rate[2],
 			imu_data.acceleration[0],imu_data.acceleration[1],imu_data.acceleration[2],
-			imu_data.magnetic[0],imu_data.magnetic[1],imu_data.magnetic[2]);/*,
-			navdata.measure.ax, navdata.measure.ay, navdata.measure.az,
-			navdata.measure.mx, navdata.measure.my, navdata.measure.mz,
-			navdata.measure.ultrasound,navdata.measure.temperature_acc,navdata.measure.temperature_gyro);
-*/
+			imu_data.magnetic[0],imu_data.magnetic[1],imu_data.magnetic[2]);
 }
 
 void close_navdata(void){

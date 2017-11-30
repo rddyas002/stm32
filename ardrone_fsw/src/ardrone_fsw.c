@@ -17,6 +17,7 @@
 #include "motors.h"
 #include "spektrum.h"
 #include "timing.h"
+#include "ekf.h"
 
 static volatile int keepRunning = 1;
 void intHandler(int dummy) {
@@ -24,16 +25,18 @@ void intHandler(int dummy) {
 }
 
 extern struct navdata_t navdata;
+extern imu_data_s imu_data;
 
 int main(void) {
 	signal(SIGINT, intHandler);
-	double t0 = timeNow_us();
-
 	if (!navdata_init()) exit(1);
 	//if(!actuators_ardrone_init()) exit(1);
 	//if(!spektrum_init()) exit(1);
 
 	while(keepRunning){
+		double now = timeNow_us();
+		while ((timeNow_us() - now) < 1000000);
+		printf("%5.2f,%5.2f,%5.2f|%5.2f,%5.2f,%5.2f\r\n", imu_data.ypr[0],imu_data.ypr[1],imu_data.ypr[2],imu_data.w_bias[0]*180.0f/M_PI_f,imu_data.w_bias[1]*180.0f/M_PI_f,imu_data.w_bias[2]*180.0f/M_PI_f);
 
 	}
 	//actuators_ardrone_close();
