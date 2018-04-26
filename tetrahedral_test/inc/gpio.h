@@ -16,5 +16,6 @@
 
 void init_gpio(void);
 void init_tim4(void);
+uint32_t PWM_sat_limit(uint32_t value);
 
 #endif /* GPIO_H_ */

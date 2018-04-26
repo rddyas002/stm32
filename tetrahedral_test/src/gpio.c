@@ -82,4 +82,23 @@ void init_tim4(void){
     GPIO_InitStruct.GPIO_Mode = GPIO_Mode_AF;
     GPIO_InitStruct.GPIO_Speed = GPIO_Speed_100MHz;
     GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+    // enable interrupt
+    NVIC_InitTypeDef NVIC_InitStructure;
+    /* Enable the TIM global Interrupt */
+    NVIC_InitStructure.NVIC_IRQChannel = TIM3_IRQn;
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
+    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+    NVIC_Init(&NVIC_InitStructure);
+
+    /* TIM IT enable */
+    TIM_ITConfig(TIM3, TIM_IT_Update, ENABLE);  // Enable interrupts for LED_TIM
+}
+
+uint32_t PWM_sat_limit(uint32_t value){
+	if (value > PWM_MAX)
+		return PWM_MAX;
+	if (value < PWM_MIN)
+		return PWM_MIN;
+	return value;
 }
