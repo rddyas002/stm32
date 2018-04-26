@@ -134,6 +134,12 @@ void computeGyroStats(imu_data_s * imu_data){
 	}
 }
 
+/*
+ * USART: PA9 [Tx]  PA10 [Rx]
+ * I2C:	  PB6 [SCL] PB7 [SDA]
+ * PWM:   PB4|PB5|PB0|PB1 --> |TIM3_CH1|TIM3_CH2|TIM3_CH3|TIM3_CH4|
+ */
+
 int main(void) {
 	imu_data_s imu_data;
 	uint8_t buffer[256];
@@ -158,6 +164,7 @@ int main(void) {
 	init_gpio();
 	init_USART2(115200);
 	init_cci(129);
+	init_tim4();
 	computeInitMeasurementFrame(&imu_data);
 
 	init_ekf(&imu_data);

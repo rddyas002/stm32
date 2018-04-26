@@ -1,3 +1,4 @@
+/*
 // arm-none-linux-gnueabi-gcc -o v4l2_test v4l2_test.c
 
 #include <stdio.h>
@@ -185,3 +186,4 @@ int main(int argc,char ** argv)
     fclose(file_fd);
     return 0;
 }
+*/
