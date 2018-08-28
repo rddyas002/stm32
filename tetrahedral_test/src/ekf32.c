@@ -81,7 +81,7 @@ void run_ekf_32(float Ts, float gyro[3], float accel[3], float magnetic[3], floa
 	updateStateAndCovariance_32(x_f32_a, P_f32_a, R_f32_a, y);
 
 	arm_copy_f32(&x_f32_a[0], q, 4);
-	arm_copy_f32(&x_f32_a[3], w, 3);
+	arm_copy_f32(&x_f32_a[4], w, 3);
 }
 
 void propagateState_32(float32_t x[7], float32_t u[3], float32_t Ts){

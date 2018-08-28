@@ -134,6 +134,12 @@ void computeGyroStats(imu_data_s * imu_data){
 	}
 }
 
+/*
+ * USART: PA9 [Tx]  PA10 [Rx]
+ * I2C:	  PB6 [SCL] PB7 [SDA]
+ * PWM:   PB4|PB5|PB0|PB1 --> |TIM3_CH1|TIM3_CH2|TIM3_CH3|TIM3_CH4|
+ */
+volatile uint32_t motors[4] = {PWM_ZERO, PWM_ZERO, PWM_ZERO, PWM_ZERO};
 int main(void) {
 	imu_data_s imu_data;
 	uint8_t buffer[256];
@@ -158,6 +164,7 @@ int main(void) {
 	init_gpio();
 	init_USART2(115200);
 	init_cci(129);
+	init_tim4();
 	computeInitMeasurementFrame(&imu_data);
 
 	init_ekf(&imu_data);
@@ -187,7 +194,21 @@ int main(void) {
 			GPIO_WriteBit(GPIOD, GPIO_Pin_12, Bit_SET);
 			run_ekf_32(delta_t_32, imu_data.rate, imu_data.acceleration, imu_data.magnetic, &q_32[0], &b_32[0]);
 			q2ypr_32(q_32, ypr_32);
+			float w_est[3] = {0};
+			w_est[0] = imu_data.rate[0];	//dps
+			w_est[1] = imu_data.rate[1];	//dps
+			w_est[2] = imu_data.rate[2];	//dps
 			GPIO_WriteBit(GPIOD, GPIO_Pin_12, Bit_RESET);
+
+			w_est[0] *= 680/(2000*1.22); // maps -2000<->+2000 to -557<->+557
+			w_est[1] *= 680/(2000*1.22);
+			w_est[2] *= 680/(2000*1.22);
+
+			// motors should range between -680<->+680
+			motors[0] =  0.0000*w_est[0] + 0.7500*w_est[1] + 0.0000*w_est[2];
+			motors[1] =  0.7071*w_est[0] + 0.2500*w_est[1] + 0.0000*w_est[2];
+			motors[2] = -0.3536*w_est[0] + 0.2500*w_est[1] + 0.6124*w_est[2];
+			motors[3] = -0.3536*w_est[0] + 0.2500*w_est[1] - 0.6124*w_est[2];
 
 			flag10ms = false;
 		}
@@ -200,4 +221,18 @@ int main(void) {
 		}
 
 	}
+}
+
+void TIM3_IRQHandler(void)
+{
+if (TIM_GetITStatus(TIM3, TIM_IT_Update) != RESET)
+  {
+    TIM_ClearITPendingBit(TIM3, TIM_IT_Update);
+
+    TIM_SetCompare1(TIM3, PWM_sat_limit(motors[0] + PWM_ZERO));
+    TIM_SetCompare2(TIM3, PWM_sat_limit(motors[1] + PWM_ZERO));
+    TIM_SetCompare3(TIM3, PWM_sat_limit(motors[2] + PWM_ZERO));
+    TIM_SetCompare4(TIM3, PWM_sat_limit(motors[3] + PWM_ZERO));
+
+  }
 }
